@@ -31,10 +31,14 @@ fn main() {
 supported formats 
 =================
 
-| ImageData::RGB | 8-bit RGB without alpha |
-| ImageData::RGBA | 8-bit RGB with alpha |
-| ImageData::RGB16 | 16-bit plain RGB without alpha |
-| ImageData::RGBA16 | 16-bit RGB with alpha |
-| ImageData::NDX | 8-bit indexed palette without alpha |
-| ImageData::NDXA | 8-bit indexed palette with alpha |
+| enum variant      |                                     |
+|-------------------|-------------------------------------|
+| ImageData::RGB    | 8-bit RGB without alpha             |
+| ImageData::RGBA   | 8-bit RGB with alpha                |
+| ImageData::RGB16  | 16-bit plain RGB without alpha      |
+| ImageData::RGBA16 | 16-bit RGB with alpha               |
+| ImageData::NDX    | 8-bit indexed palette without alpha |
+| ImageData::NDXA   | 8-bit indexed palette with alpha    |
+
+
 
