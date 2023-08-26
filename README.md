@@ -2,7 +2,7 @@ usage
 =====
 
 ```rust
-use tiny_png::{read_png, write_apng, Image, ImageData};
+use micro_png::{read_png, write_apng, Image, ImageData};
 
 fn main() {
     // load an image
@@ -19,8 +19,8 @@ fn main() {
     });
 
     // now write it back as one-frame image
-  
-    write_apng(&"back.png".to_string(), 
+
+    write_apng(&"back.png".to_string(),
         &ImageData::RGBA16(vec![data]),
         None,
         None,
@@ -28,7 +28,7 @@ fn main() {
 }
 ```
 
-supported formats 
+supported formats
 =================
 
 | enum variant      |                                     |

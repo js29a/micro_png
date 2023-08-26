@@ -1,9 +1,9 @@
 [package]
-name = "tiny_png"
+name = "micro_png"
 license = "LGPL-2.1"
 # homepage = ""
 # documentation = ""
-repository = "https://github.com/js29a/tiny_png"
+repository = "https://github.com/js29a/micro_png"
 version = "0.1.0"
 edition = "2021"
 readme = "README.md"

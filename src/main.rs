@@ -1,4 +1,4 @@
-use tiny_png::{read_png, write_apng, ImageData};
+use micro_png::{read_png, write_apng, ImageData};
 
 fn main() {
     // load an image
