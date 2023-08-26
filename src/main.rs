@@ -1,4 +1,4 @@
-use tiny_png::{read_png, write_apng, Image, ImageData};
+use tiny_png::{read_png, write_apng, ImageData};
 
 fn main() {
     // load an image
@@ -10,13 +10,13 @@ fn main() {
 
     (0 .. image.height()).for_each(|y| {
       (0 .. image.width()).for_each(|x| {
-        let pixel = data[y][x]; // (u16, u16, u16, u16)
+        let _pixel = data[y][x]; // (u16, u16, u16, u16)
       });
     });
 
     // now write it back as one-frame image
-  
-    write_apng(&"back.png".to_string(), 
+
+    write_apng(&"back.png".to_string(),
         &ImageData::RGBA16(vec![data]),
         None,
         None,

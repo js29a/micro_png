@@ -40,5 +40,3 @@ supported formats
 | ImageData::NDX    | 8-bit indexed palette without alpha |
 | ImageData::NDXA   | 8-bit indexed palette with alpha    |
 
-
-
