@@ -2,7 +2,7 @@ use micro_png::{read_png, write_apng, ImageData};
 
 fn main() {
     // load an image
-    let image = read_png(&"test.png".to_string()).expect("can't load test.png");
+    let image = read_png("test.png").expect("can't load test.png");
 
     println!("{} x {}", image.width(), image.height());
 
@@ -16,7 +16,7 @@ fn main() {
 
     // now write it back as one-frame image
 
-    write_apng(&"back.png".to_string(),
+    write_apng("back.png",
         &ImageData::RGBA16(vec![data]),
         None ,// automatically select filtering
         None, // no progress callback

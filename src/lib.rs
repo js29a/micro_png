@@ -100,7 +100,7 @@ impl Image {
     }
 }
 
-pub type APNGProgress = fn (cur: usize, total: usize, descr: &String);
+pub type APNGProgress = fn (cur: usize, total: usize, descr: &str);
 
 pub type Pred = fn (line: &[RGBA16], above: &[RGBA16], color_type: ColorType) -> Vec<u8>;
 
@@ -651,7 +651,7 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
 
         zip(0 .. frame.len(), frame.iter()).for_each(|(y, row_raw)| {
             if let Some(p) = progress {
-                p(y, frame.len(), &"lines".to_string());
+                p(y, frame.len(), "lines");
             }
 
             let mut so_far: Vec<u8> = vec![];
@@ -841,7 +841,7 @@ fn apng_frames(image_data: &ImageData, forced: Option<PkEst>, progress: Option<A
     zip(0 .. frames.len() as u32, frames.iter()).for_each(|(ndx, frame)| {
         if frames.len() > 1 && progress.is_some() {
             if let Some(p) = progress {
-                p(ndx as usize, frames.len(), &"frames".to_string());
+                p(ndx as usize, frames.len(), "frames");
             }
         }
 
@@ -906,7 +906,7 @@ fn apng_frames(image_data: &ImageData, forced: Option<PkEst>, progress: Option<A
     Ok(res)
 }
 
-pub fn write_apng(fname: &String, image_data: &ImageData, forced: Option<PkEst>,
+pub fn write_apng(fname: &str, image_data: &ImageData, forced: Option<PkEst>,
     progress: Option<APNGProgress>, adam_7: bool) -> Result<(), String> {
     if let Ok(mut f) = File::create(fname) {
         if f.write_all(&apng_frames(image_data, forced, progress, adam_7)?).is_err() {
@@ -1269,7 +1269,7 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
     }
 }
 
-pub fn read_png(fname: &String) -> Result<Image, String> {
+pub fn read_png(fname: &str) -> Result<Image, String> {
     let mut input = match File::open(fname) {
         Ok(f) => f,
         Err(_) => return Err("cannot open file".to_string())
