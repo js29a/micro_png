@@ -18,7 +18,8 @@ fn main() {
 
     write_apng(&"back.png".to_string(),
         &ImageData::RGBA16(vec![data]),
-        None,
-        None,
-        false).expect("can't save back.png");
+        None ,// automatically select filtering
+        None, // no progress callback
+        false // no Adam-7
+    ).expect("can't save back.png");
 }

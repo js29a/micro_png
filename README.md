@@ -14,7 +14,7 @@ fn main() {
 
     (0 .. image.height()).for_each(|y| {
       (0 .. image.width()).for_each(|x| {
-        let pixel = data[y][x]; // (u16, u16, u16, u16)
+        let pixel = data[y][x]; // (R, G, B, A) as (u16, u16, u16, u16)
       });
     });
 
@@ -22,9 +22,10 @@ fn main() {
 
     write_apng(&"back.png".to_string(),
         &ImageData::RGBA16(vec![data]),
-        None,
-        None,
-        false).expect("can't save back.png");
+        None ,// automatically select filtering
+        None, // no progress callback
+        false // no Adam-7
+    ).expect("can't save back.png");
 }
 ```
 
@@ -39,4 +40,12 @@ supported formats
 | ImageData::RGBA16 | 16-bit RGB with alpha               |
 | ImageData::NDX    | 8-bit indexed palette without alpha |
 | ImageData::NDXA   | 8-bit indexed palette with alpha    |
+
+todo
+====
+
+- grayscale I/O,
+- Adam-7 input,
+- 1, 2, 4 palette bits,
+- APNG input,
 
