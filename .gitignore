@@ -3,4 +3,5 @@
 *.sw?
 /target
 /tmp
+Cargo.lock
 
