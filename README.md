@@ -6,7 +6,7 @@ use micro_png::{read_png, write_apng, Image, ImageData};
 
 fn main() {
     // load an image
-    let image = read_png(&"test.png".to_string()).expect("can't load test.png");
+    let image = read_png("test.png").expect("can't load test.png");
 
     println!("{} x {}", image.width(), image.height());
 
@@ -20,7 +20,7 @@ fn main() {
 
     // now write it back as one-frame image
 
-    write_apng(&"back.png".to_string(),
+    write_apng("back.png",
         &ImageData::RGBA16(vec![data]),
         None ,// automatically select filtering
         None, // no progress callback
@@ -36,7 +36,7 @@ supported formats
 |-------------------|-------------------------------------|
 | ImageData::RGB    | 8-bit RGB without alpha             |
 | ImageData::RGBA   | 8-bit RGB with alpha                |
-| ImageData::RGB16  | 16-bit plain RGB without alpha      |
+| ImageData::RGB16  | 16-bit RGB without alpha            |
 | ImageData::RGBA16 | 16-bit RGB with alpha               |
 | ImageData::NDX    | 8-bit indexed palette without alpha |
 | ImageData::NDXA   | 8-bit indexed palette with alpha    |
