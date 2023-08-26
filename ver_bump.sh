@@ -21,40 +21,40 @@ PUSHING_MSG="${NOTICE_FLAG} Pushing new version to the ${WHITE}origin${CYAN}...$
 
 function update_package_json() {
   if [ -e package.json ]; then
-    sed -n -e "s/^  \"version\": \"[^\"]*\",$/\  \"version\": \"$1\",/;p" < package.json > tmp
-    mv tmp package.json
+    sed -n -e "s/^  \"version\": \"[^\"]*\",$/\  \"version\": \"$1\",/;p" < package.json > temp
+    mv temp package.json
     git add package.json
   fi
 }
 
 function update_version_h() {
   if [ -e version.h ]; then
-    sed -n -e "s/^\(#   \)define \([a-zA-Z0-9_]*\)VERSION \"[^\"]*\"$/\1define \2VERSION \"$1\"/;p" < version.h > tmp
-    mv tmp version.h
+    sed -n -e "s/^\(#   \)define \([a-zA-Z0-9_]*\)VERSION \"[^\"]*\"$/\1define \2VERSION \"$1\"/;p" < version.h > temp
+    mv temp version.h
     git add version.h
   fi
 }
 
 function update_config_php() {
   if [ -e config.php ]; then
-    sed -n -e "s/^define('\([a-zA-Z0-9_]*\)VERSION', '[^']*');$/define('\1VERSION', '$1');/;p" < config.php > tmp
-    mv tmp config.php
+    sed -n -e "s/^define('\([a-zA-Z0-9_]*\)VERSION', '[^']*');$/define('\1VERSION', '$1');/;p" < config.php > temp
+    mv temp config.php
     git add config.php
   fi
 }
 
 function update_ver_py() {
   if [ -e ver.py ]; then
-    sed -n -e "s/^__version__ = '[^']*'$/__version__ = '$1'/;p" < ver.py > tmp
-    mv tmp ver.py
+    sed -n -e "s/^__version__ = '[^']*'$/__version__ = '$1'/;p" < ver.py > temp
+    mv temp ver.py
     git add ver.py
   fi
 }
 
 function update_cargo_toml() {
   if [ -e Cargo.toml ]; then
-    sed -n -e "s/^version = \"[^\"]*\"$/version = \"$1\"/;p" < Cargo.toml > tmp
-    mv tmp Cargo.toml
+    sed -n -e "s/^version = \"[^\"]*\"$/version = \"$1\"/;p" < Cargo.toml > temp
+    mv temp Cargo.toml
     git add Cargo.toml
   fi
 }
