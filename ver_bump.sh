@@ -51,11 +51,20 @@ function update_ver_py() {
   fi
 }
 
+function update_cargo_toml() {
+  if [ -e Cargo.toml ]; then
+    sed -n -e "s/^version = \"[^\"]*\"$/version = \"$1\"/;p" < Cargo.toml > tmp
+    mv tmp Cargo.toml
+    git add Cargo.toml
+  fi
+}
+
 function update() {
   update_package_json $1
   update_version_h $1
   update_config_php $1
   update_ver_py $1
+  update_cargo_toml $1
 }
 
 if [ -f VERSION ]; then

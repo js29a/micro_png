@@ -7,8 +7,9 @@ repository = "https://github.com/js29a/micro_png"
 version = "0.1.1"
 edition = "2021"
 readme = "README.md"
-description = "Low-level minimalist TrueColor (8/16) PNG writer and loader with just a few dependencies."
-categories = ["png", "apng"]
+description = "Low-level minimalist TrueColor (8/16) and 8-bit palette APNG writer and PNG reader with just a few dependencies."
+categories = ["multimedia::images"]
+keywords = ["png", "apng"]
 
 [dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }

@@ -7,7 +7,6 @@ use std::collections::HashMap;
 
 use async_std::task::spawn;
 use futures::future::join_all;
-//use futures_executor;
 
 use flate2::Compression;
 use flate2::write::ZlibEncoder;
@@ -452,30 +451,10 @@ fn png_rev(left: u8, up: u8, corner: u8, est: PkEst) -> u8 {
 
 fn pk_size(payload: &[u8]) -> usize {
     compress(payload, CompressionLevel::Lvl1).len() // NOTE quick estimation
-    //let window = &payload[
-        ////(payload.len() - (1 << 15)).clamp(0, payload.len())
-     //..];
-
-    //let mut e = ZlibEncoder::new(Vec::new(), Compression::fast());
-
-    //match e.write_all(payload) {
-        //Ok(_) => (),
-        //Err(_) => panic!("compress")
-    //};
-
-    ////e.flush().unwrap();
-    ////return e.total_out() as usize;
-
-    //match e.finish() {
-        //Ok(d) => d.len(),
-        //Err(_) => panic!("zlib flush")
-    //}
 }
 
 async fn estimate_worker(est: PkEst, so_far: Vec<u8>, payload: Vec<u8>) -> (PkEst, usize, Vec<u8>) {
     async fn doit(_so_far: Vec<u8>, payload: Vec<u8>) -> usize {
-        //let mut step: Vec<u8> = so_far;
-        //step.extend(payload);
         pk_size(&payload[..])
     }
 
@@ -647,7 +626,6 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
     ];
 
     let mut payload: Vec<u8> = Vec::new();
-    //let mut res: Vec<u8> = Vec::new();
     let mut above: Vec<RGBA16> = vec![];
 
     let mut fdat: Vec<u8> = b"fdAT".to_vec(); // vec![b'f', b'd', b'A', b'T'];
@@ -660,41 +638,6 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
         *seq += 1;
         fdat.extend((*seq - 2).to_be_bytes());
     }
-
-    //let frame = if adam_7 {
-        //let mut data: Vec<Vec<RGBA16>> = Vec::new();
-        //let mut ox: usize = 0;
-        ////let mut oy: usize = 0;
-
-        //let mut line: Vec<RGBA16> = Vec::new();
-
-        //(1 ..= ADAM_7_SZ).for_each(|a| {
-            //(0 .. frames[0].len()).for_each(|y| {
-                //(0 .. frames[0][0].len()).for_each(|x| {
-                    //let ax = x % ADAM_7_SZ;
-                    //let ay = y % ADAM_7_SZ;
-
-                    //if ADAM_7[ax + ADAM_7_SZ * ay] == a {
-                        //line.push(frames[ndx as usize][y][x]);
-                        //ox += 1;
-                        //if ox == frames[ndx as usize].len() {
-                            //ox = 0;
-                            //data.push(line.clone());
-                            //line = vec![];
-                        //}
-                    //}
-                //})
-            //});
-        //});
-
-        //println!("{} {}", data.len(), data[0].len());
-
-        //data
-    //}
-    //else {
-        //frames[ndx as usize].clone()
-    //};
-
 
     let frame = &frames[ndx as usize];
     let mut first = true;
@@ -1771,27 +1714,6 @@ mod tests {
             pal
         )
     }
-
-    //fn progress(_cur: usize, _max: usize, _descr: &String) {
-    //}
-
-    //#[test]
-    //pub fn test_rgba_none() {
-        //let image = image_rgba();
-
-        //write_apng(&"tmp/rgba_None.png".to_string(),
-            //&ImageData::RGBA(vec![image]),
-            //Some(PkEst::None),
-            //progress
-        //).unwrap();
-
-        //let back = read_png(&"tmp/rgba_None.png".to_string()).unwrap();
-
-        //assert_eq!(back.width, 256);
-        //assert_eq!(back.height, 196);
-        //assert_eq!(back.color_type, ColorType::RGBA);
-        //assert_eq!(back.data, image);
-    //}
 
     #[test]
     pub fn test_rgba_all() {
