@@ -2,9 +2,9 @@
 name = "tiny_png"
 license = "LGPL-2.1"
 homepage = ""
-documentation = ""
-repository = ""
-version = "0.1.0"
+# documentation = ""
+repository = "https://github.com/js29a/tiny_png"
+version = "0.1.1"
 edition = "2021"
 readme = "README.md"
 
