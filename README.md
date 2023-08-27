@@ -95,6 +95,5 @@ todo
 
 - grayscale I/O,
 - Adam-7 input,
-- 1, 2, 4 palette bits,
 - APNG input,
 

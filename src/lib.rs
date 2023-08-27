@@ -2439,7 +2439,7 @@ mod tests {
         types.iter().for_each(|est| {
             println!("{est:?}");
 
-            let fname = format!("tmp/ndx_{est:?}.png");
+            let fname = format!("tmp/ndx_{est:?}_8.png");
 
             write_apng(&fname,
                 ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B8),
@@ -2658,7 +2658,7 @@ mod tests {
             assert_eq!(back.height, 196);
             assert_eq!(back.color_type, ColorType::NDXA(Palette::B4));
             assert_eq!(back.data, orig);
-            //assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B4));
+            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B4));
         });
     }
 
@@ -2677,7 +2677,7 @@ mod tests {
         types.iter().for_each(|est| {
             println!("{est:?}");
 
-            let fname = format!("tmp/ndxa_{est:?}.png");
+            let fname = format!("tmp/ndxa_{est:?}_8.png");
 
             write_apng(&fname,
                 ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B8),
