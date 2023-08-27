@@ -843,11 +843,19 @@ fn prepare_frames(image_data: &ImageData) -> Vec<Vec<Vec<RGBA16>>> {
 fn gen_palette(image_data: &ImageData) -> Vec<u8> {
     let mut res: Vec<u8> = Vec::new();
 
+    let pal_len = match image_data {
+        ImageData::NDXA(_, _, Palette::B8) | ImageData::NDX(_, _, Palette::B8) => 256,
+        ImageData::NDXA(_, _, Palette::B4) | ImageData::NDX(_, _, Palette::B4) => 16,
+        ImageData::NDXA(_, _, Palette::B2) | ImageData::NDX(_, _, Palette::B2) => 4,
+        ImageData::NDXA(_, _, Palette::B1) | ImageData::NDX(_, _, Palette::B1) => 2,
+        _ => 0
+    };
+
     match image_data {
         ImageData::NDXA(_, pal, _) => {
             let mut plte: Vec<u8> = b"PLTE".to_vec();
 
-            plte.extend(pal.iter().map(|rgba: &RGBA| {
+            plte.extend(pal[0 .. pal_len].iter().map(|rgba: &RGBA| {
                 vec![
                     rgba.0,
                     rgba.1,
@@ -859,7 +867,7 @@ fn gen_palette(image_data: &ImageData) -> Vec<u8> {
 
             let mut trns: Vec<u8> = b"tRNS".to_vec();
 
-            trns.extend(pal.iter().map(|rgba: &RGBA| {
+            trns.extend(pal[0 .. pal_len].iter().map(|rgba: &RGBA| {
                 rgba.3
             }).collect::<Vec<u8>>());
 
@@ -868,7 +876,7 @@ fn gen_palette(image_data: &ImageData) -> Vec<u8> {
         ImageData::NDX(_, pal, _) => {
             let mut plte: Vec<u8> = b"PLTE".to_vec();
 
-            plte.extend(pal.iter().map(|rgb: &RGB| {
+            plte.extend(pal[0 .. pal_len].iter().map(|rgb: &RGB| {
                 vec![
                     rgb.0,
                     rgb.1,
@@ -2111,7 +2119,7 @@ mod tests {
         let mut orig_img: Vec<Vec<RGBA16>> = Vec::new();
         let mut data_img: Vec<Vec<u8>> = Vec::new();
 
-        (0 .. pal.len()).for_each(|k| {
+        (0 .. ps).for_each(|k| {
             let l = 255 * k / ps;
             pal[k].0 = l as u8;
             pal[k].1 = (64 + l) as u8;
@@ -2146,6 +2154,8 @@ mod tests {
     fn image_ndxa(ps: usize) -> (Vec<Vec<RGBA16>>, // restored image
                                  Vec<Vec<u8>>, // @ 0: pal ndx for writer,
                                  Vec<RGBA>) { // palette
+        assert!(ps == 2 || ps == 4 || ps == 16 || ps == 256);
+
         let w = 133_usize;
         let h = 196_usize;
 
@@ -2154,11 +2164,12 @@ mod tests {
         let mut orig_img: Vec<Vec<RGBA16>> = Vec::new();
         let mut data_img: Vec<Vec<u8>> = Vec::new();
 
-        (0 .. pal.len()).for_each(|k| {
-            pal[k].0 = k as u8;
-            pal[k].1 = (64 + k) as u8;
-            pal[k].2 = (128 + k) as u8;
-            pal[k].3 = (128_i16 - k as i16) as u8;
+        (0 .. ps).for_each(|k| {
+            let l = 255 * k / ps;
+            pal[k].0 = l as u8;
+            pal[k].1 = (64 + l) as u8;
+            pal[k].2 = (128 + l) as u8;
+            pal[k].3 = (255 - l) as u8;
         });
 
         (0 .. h).for_each(|y| {
@@ -2463,6 +2474,108 @@ mod tests {
             assert_eq!(back.color_type, ColorType::NDX(Palette::B4));
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B4));
+        });
+    }
+
+    #[test]
+    pub fn test_ndxa_2_all() {
+        let (orig, data, pal) = image_ndxa(4);
+
+        let types = vec![
+            Filter::None,
+            Filter::Sub,
+            Filter::Up,
+            Filter::Avg,
+            Filter::Paeth
+        ];
+
+        types.iter().for_each(|est| {
+            println!("{est:?}");
+
+            let fname = format!("tmp/ndxa_{est:?}_2.png");
+
+            write_apng(&fname,
+                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B2),
+                Some(*est),
+                None,
+                false
+            ).unwrap();
+
+            let back = read_png(&fname).unwrap();
+
+            assert_eq!(back.width, 133);
+            assert_eq!(back.height, 196);
+            assert_eq!(back.color_type, ColorType::NDXA(Palette::B2));
+            assert_eq!(back.data, orig);
+            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B2));
+        });
+    }
+
+    #[test]
+    pub fn test_ndxa_1_all() {
+        let (orig, data, pal) = image_ndxa(2);
+
+        let types = vec![
+            Filter::None,
+            Filter::Sub,
+            Filter::Up,
+            Filter::Avg,
+            Filter::Paeth
+        ];
+
+        types.iter().for_each(|est| {
+            println!("{est:?}");
+
+            let fname = format!("tmp/ndxa_{est:?}_1.png");
+
+            write_apng(&fname,
+                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B1),
+                Some(*est),
+                None,
+                false
+            ).unwrap();
+
+            let back = read_png(&fname).unwrap();
+
+            assert_eq!(back.width, 133);
+            assert_eq!(back.height, 196);
+            assert_eq!(back.color_type, ColorType::NDXA(Palette::B1));
+            assert_eq!(back.data, orig);
+            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B1));
+        });
+    }
+
+    #[test]
+    pub fn test_ndxa_4_all() {
+        let (orig, data, pal) = image_ndxa(16);
+
+        let types = vec![
+            Filter::None,
+            Filter::Sub,
+            Filter::Up,
+            Filter::Avg,
+            Filter::Paeth
+        ];
+
+        types.iter().for_each(|est| {
+            println!("{est:?}");
+
+            let fname = format!("tmp/ndxa_{est:?}_4.png");
+
+            write_apng(&fname,
+                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B4),
+                Some(*est),
+                None,
+                false
+            ).unwrap();
+
+            let back = read_png(&fname).unwrap();
+
+            assert_eq!(back.width, 133);
+            assert_eq!(back.height, 196);
+            assert_eq!(back.color_type, ColorType::NDXA(Palette::B4));
+            assert_eq!(back.data, orig);
+            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B4));
         });
     }
 
