@@ -29,6 +29,19 @@ pub type RGBA16 = (u16, u16, u16, u16);
 /// Palette index.
 pub type NDX = u8;
 
+/// Palette type.
+#[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
+pub enum Palette {
+/// One-bit palette - 2 colors.
+    B1,
+/// Two-bit palette - 4 colors.
+    B2,
+/// Four-bit palette - 16 colors.
+    B4,
+/// Eight-bit palette - 256 colors.
+    B8
+}
+
 const ADAM_7: [usize; 64] = [
     1, 6, 4, 6, 2, 6, 4, 6,
     7, 7, 7, 7, 7, 7, 7, 7,
@@ -64,10 +77,10 @@ pub enum ColorType {
     RGB,
 /// RGB + Alpha 8 bits - [ImageData::RGBA].
     RGBA,
-/// Indexed mode - 256 colors - [ImageData::NDX].
-    NDX,
-/// Indexed mode + Alpha - 256 colors - [ImageData::NDXA].
-    NDXA,
+/// Indexed mode - 2, 4, 16 or 256 colors - [ImageData::NDX].
+    NDX(Palette),
+/// Indexed mode + Alpha - 2, 4, 16 or 256 colors - [ImageData::NDXA].
+    NDXA(Palette),
 /// RGB 16 bits - [ImageData::RGB16].
     RGB16,
 /// RGB + Alpha 16 bits - [ImageData::RGBA16].
@@ -88,9 +101,9 @@ pub enum ImageData {
 /// 32 bit color mode.
     RGBA(Vec<Vec<Vec<RGBA>>>),
 /// 256-color palette without Alpha.
-    NDX(Vec<Vec<Vec<NDX>>>, Vec<RGB>),
+    NDX(Vec<Vec<Vec<NDX>>>, Vec<RGB>, Palette),
 /// 256-color palette with Alpha for each palette entry.
-    NDXA(Vec<Vec<Vec<NDX>>>, Vec<RGBA>),
+    NDXA(Vec<Vec<Vec<NDX>>>, Vec<RGBA>, Palette),
 /// 48 bit color mode.
     RGB16(Vec<Vec<Vec<RGB16>>>),
 /// 64 bit color mode.
@@ -337,7 +350,9 @@ fn png_none(row: &[RGBA16], _above: &[RGBA16], color_type: ColorType) -> Vec<u8>
                 (pix.1 >> 8) as u8,
                 (pix.2 >> 8) as u8
             ],
-            ColorType::NDXA | ColorType::NDX => vec![pix.0 as u8],
+            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => vec![pix.0 as u8],
+            ColorType::NDXA(p) | ColorType::NDX(p) =>
+                panic!("no support for indexed mode {p:?}")
         }
     }).collect::<Vec<Vec<u8>>>().iter().flatten());
 
@@ -383,9 +398,11 @@ fn png_sub(row: &[RGBA16], _above: &[RGBA16], color_type: ColorType) -> Vec<u8> 
                 sub((pix.1 >> 8) as u8, (prev.1 >> 8) as u8),
                 sub((pix.2 >> 8) as u8, (prev.2 >> 8) as u8)
             ],
-            ColorType::NDXA | ColorType::NDX => vec![
+            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => vec![
                 sub((pix.0 & 0xff) as u8, (prev.0 & 0xff) as u8),
-            ]
+            ],
+            ColorType::NDXA(p) | ColorType::NDX(p) =>
+                panic!("no support for indexed mode: {p:?}")
         };
         prev = *pix;
         r
@@ -434,10 +451,12 @@ fn png_up(row: &[RGBA16], above: &[RGBA16], color_type: ColorType) -> Vec<u8> {
                     sub(((pix.1) >> 8) as u8, (above[x].1 >> 8) as u8),
                     sub(((pix.2) >> 8) as u8, (above[x].2 >> 8) as u8),
                 ],
-            ColorType::NDXA | ColorType::NDX =>
+            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) =>
                 vec![
                     sub(pix.0 as u8, above[x].0 as u8)
-                ]
+                ],
+            ColorType::NDXA(p) | ColorType::NDX(p) =>
+                panic!("no support for indexed mode: {p:?}")
         }
     }).collect::<Vec<Vec<u8>>>().iter().flatten());
 
@@ -493,9 +512,11 @@ fn png_avg(row: &[RGBA16], above: &[RGBA16], color_type: ColorType) -> Vec<u8> {
                 sub((pix.1 >> 8) as u8, a1h),
                 sub((pix.2 >> 8) as u8, a2h),
             ],
-            ColorType::NDXA | ColorType::NDX => vec![
-                sub(pix.0 as u8, a0l)
-            ]
+            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => vec![
+                sub(pix.0 as u8, a0l),
+            ],
+            ColorType::NDXA(p) | ColorType::NDX(p) =>
+                panic!("no support for indexed mode: {p:?}")
         };
 
         prev = *pix;
@@ -587,9 +608,11 @@ fn png_paeth(row: &[RGBA16], above: &[RGBA16], color_type: ColorType) -> Vec<u8>
                 sub((pix.1 >> 8) as u8, paeth(a1h, b1h, c1h)),
                 sub((pix.2 >> 8) as u8, paeth(a2h, b2h, c2h)),
             ],
-            ColorType::NDXA | ColorType::NDX => vec![
-                sub((pix.0 & 0xff) as u8, paeth(a0l, b0l, c0l))
-            ]
+            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => vec![
+                sub((pix.0 & 0xff) as u8, paeth(a0l, b0l, c0l)),
+            ],
+            ColorType::NDXA(p) | ColorType::NDX(p) =>
+                panic!("no support for indexed mode: {p:?}")
         };
 
         prev = *pix;
@@ -699,7 +722,7 @@ fn prepare_frames(image_data: &ImageData) -> Vec<Vec<Vec<RGBA16>>> {
                     }).collect()
                 }).collect()
             }).collect(),
-        ImageData::NDXA(ndx, _) | ImageData::NDX(ndx, _) =>
+        ImageData::NDXA(ndx, _, Palette::B8) | ImageData::NDX(ndx, _, Palette::B8) =>
             ndx.iter().map(|frame| -> Vec<Vec<RGBA16>> {
                 frame.iter().map(|line| -> Vec<RGBA16> {
                     line.iter().map(|pix| -> RGBA16 {
@@ -711,7 +734,9 @@ fn prepare_frames(image_data: &ImageData) -> Vec<Vec<Vec<RGBA16>>> {
                         )
                     }).collect()
                 }).collect()
-            }).collect()
+            }).collect(),
+        ImageData::NDXA(_, _, p) | ImageData::NDX(_, _, p) =>
+            panic!("no support for indexed mode: {p:?}")
     }
 }
 
@@ -719,7 +744,7 @@ fn gen_palette(image_data: &ImageData) -> Vec<u8> {
     let mut res: Vec<u8> = Vec::new();
 
     match image_data {
-        ImageData::NDXA(_, pal) => {
+        ImageData::NDXA(_, pal, _) => {
             let mut plte: Vec<u8> = b"PLTE".to_vec();
 
             plte.extend(pal.iter().map(|rgba: &RGBA| {
@@ -740,7 +765,7 @@ fn gen_palette(image_data: &ImageData) -> Vec<u8> {
 
             res.extend(png_chunk(&trns));
         },
-        ImageData::NDX(_, pal) => {
+        ImageData::NDX(_, pal, _) => {
             let mut plte: Vec<u8> = b"PLTE".to_vec();
 
             plte.extend(pal.iter().map(|rgb: &RGB| {
@@ -951,8 +976,8 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
         ImageData::RGB16(_) => ColorType::RGB16,
         ImageData::RGBA(_) => ColorType::RGBA,
         ImageData::RGB(_) => ColorType::RGB,
-        ImageData::NDXA(_, _) => ColorType::NDXA,
-        ImageData::NDX(_, _) => ColorType::NDX
+        ImageData::NDXA(_, _, p) => ColorType::NDXA(*p),
+        ImageData::NDX(_, _, p) => ColorType::NDX(*p)
     };
 
     let frames = prepare_frames(image_data);
@@ -974,8 +999,10 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
         ColorType::RGB16 => b'\x02',
         ColorType::RGBA => b'\x06',
         ColorType::RGB => b'\x02',
-        ColorType::NDX => b'\x03',
-        ColorType::NDXA => b'\x03',
+        ColorType::NDX(Palette::B8) => b'\x03',
+        ColorType::NDXA(Palette::B8) => b'\x03',
+        ColorType::NDXA(p) | ColorType::NDX(p) =>
+            panic!("no support for indexed mode: {p:?}")
     };
 
     let bpp = match color_type {
@@ -983,8 +1010,10 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
         ColorType::RGB16 => b'\x10',
         ColorType::RGBA => b'\x08',
         ColorType::RGB => b'\x08',
-        ColorType::NDX => b'\x08',
-        ColorType::NDXA => b'\x08',
+        ColorType::NDX(Palette::B8) => b'\x08',
+        ColorType::NDXA(Palette::B8) => b'\x08',
+        ColorType::NDXA(p) | ColorType::NDX(p) =>
+            panic!("no support for indexed mode: {p:?}")
     };
 
     ihdr.append(&mut vec![bpp, color_byte, b'\x00', b'\x00', if adam_7 { b'\x01' } else { b'\x00' }]);
@@ -1234,7 +1263,9 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
         ColorType::RGB16 => width * 3 * 2 + 1,
         ColorType::RGBA => width * 4 + 1,
         ColorType::RGB => width * 3 + 1,
-        ColorType::NDXA | ColorType::NDX => width + 1
+        ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => width + 1,
+        ColorType::NDXA(p) | ColorType::NDX(p) =>
+            panic!("no support for indexed mode: {p:?}")
     };
 
     let mut above: Vec<RGBA16> = vec![(0, 0, 0, 0); width];
@@ -1247,7 +1278,9 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
             ColorType::RGB16 => (width * 3 * 2 + 1) * y,
             ColorType::RGBA => (width * 4 + 1) * y,
             ColorType::RGB => (width * 3 + 1) * y,
-            ColorType::NDXA | ColorType::NDX => (width + 1) * y
+            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => (width + 1) * y,
+            ColorType::NDXA(p) | ColorType::NDX(p) =>
+                panic!("no support for indexed mode: {p:?}")
         };
         let slice = &raw[offs .. offs + slice_len];
         let mode = slice[0];
@@ -1470,7 +1503,7 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                 });
                 raw_rgb.push(rgb_line);
             },
-            ColorType::NDXA | ColorType::NDX => {
+            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => {
                 ndx_line = Vec::new();
                 //let mut ndx_line: Vec<u8> = Vec::new();
                 let pal_status = (0 .. width).map(|ox| -> Result<(), String> {
@@ -1496,7 +1529,7 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                         pix.0,
                         pix.1,
                         pix.2,
-                        if ColorType::NDX == color_type {
+                        if ColorType::NDX(Palette::B8) == color_type {
                             0xffff_u16
                         }
                         else {
@@ -1510,7 +1543,9 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                     return e;
                 }
                 raw_ndx.push(ndx_line.clone());
-            }
+            },
+            ColorType::NDXA(p) | ColorType::NDX(p) =>
+                panic!("no support for indexed mode: {p:?}")
         };
 
         above = line.clone();
@@ -1526,8 +1561,8 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
         ColorType::RGB16 => ImageData::RGB16(vec![raw_rgb16]),
         ColorType::RGBA => ImageData::RGBA(vec![raw_rgba]),
         ColorType::RGB => ImageData::RGB(vec![raw_rgb]),
-        ColorType::NDXA => ImageData::NDXA(vec![raw_ndx], pal.clone()),
-        ColorType::NDX => {
+        ColorType::NDXA(Palette::B8) => ImageData::NDXA(vec![raw_ndx], pal.clone(), Palette::B8),
+        ColorType::NDX(Palette::B8) => {
             let pal_rgb: Vec<RGB> = pal.iter().map(|pal| {
                 (
                     pal.0,
@@ -1535,8 +1570,10 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                     pal.2
                 )
             }).collect();
-            ImageData::NDX(vec![raw_ndx], pal_rgb)
-        }
+            ImageData::NDX(vec![raw_ndx], pal_rgb, Palette::B8)
+        },
+        ColorType::NDXA(p) | ColorType::NDX(p) =>
+            panic!("no support for indexed mode: {p:?}")
     };
 
     match status {
@@ -1602,7 +1639,7 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
             match color {
                 6 => if depth == 8 { color_type = ColorType::RGBA } else { color_type = ColorType::RGBA16 },
                 2 => if depth == 8 { color_type = ColorType::RGB } else { color_type = ColorType::RGB16 },
-                3 => color_type = ColorType::NDX, // NOTE upgrade to NDXA av
+                3 => color_type = ColorType::NDX(Palette::B8), // NOTE upgrade to NDXA av
                 c => return Err(format!("color type {c} not supported"))
             }
 
@@ -1630,7 +1667,9 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                 ColorType::RGB16 => (width * 3 * 2 + 1) * height,
                 ColorType::RGBA => (width * 4 + 1) * height,
                 ColorType::RGB => (width * 3 + 1) * height,
-                ColorType::NDXA | ColorType::NDX => (width + 1) * height
+                ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => (width + 1) * height,
+                ColorType::NDXA(p) | ColorType::NDX(p) =>
+                    panic!("no support for indexed mode: {p:?}")
             };
 
             if let Err(e) = deco.read_to_end(&mut unpacked) {
@@ -1652,24 +1691,29 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
             prev_idat = true;
         }
 
-        if chunk.0 == "PLTE" && (ColorType::NDXA == color_type || ColorType::NDX == color_type) {
-            let ps = chunk.1.len() / 3;
+        if chunk.0 == "PLTE" {
+            match color_type {
+                ColorType::NDXA(_) | ColorType::NDX(_) => {
+                    let ps = chunk.1.len() / 3;
 
-            (0 .. ps).for_each(|pndx| {
-                pal[pndx].0 = chunk.1[pndx * 3];
-                pal[pndx].1 = chunk.1[pndx * 3 + 1];
-                pal[pndx].2 = chunk.1[pndx * 3 + 2];
-            });
-            // NOTE just ignore
+                    (0 .. ps).for_each(|pndx| {
+                        pal[pndx].0 = chunk.1[pndx * 3];
+                        pal[pndx].1 = chunk.1[pndx * 3 + 1];
+                        pal[pndx].2 = chunk.1[pndx * 3 + 2];
+                    });
+                    // NOTE just ignore
+                }
+                _ => ()
+            }
         }
 
         if chunk.0 == "tRNS" {
-            if let ColorType::NDX = color_type {
+            if let ColorType::NDX(p) = color_type {
                 (0 .. chunk.1.len()).for_each(|pndx| {
                     pal[pndx].3 = chunk.1[pndx];
                 });
 
-                color_type = ColorType::NDXA; // NOTE upgrade
+                color_type = ColorType::NDXA(p); // NOTE upgrade
             }
             // NOTE just ignore
         }
@@ -1937,7 +1981,7 @@ mod tests {
         (res_orig, res_data)
     }
 
-    fn image_ndx() -> (Vec<Vec<RGBA16>>, // restored image
+    fn image_ndx_8() -> (Vec<Vec<RGBA16>>, // restored image
                        Vec<Vec<u8>>, // @ 0: pal ndx for writer,
                        Vec<RGB>) { // palette
         let w = 256_usize;
@@ -1979,7 +2023,7 @@ mod tests {
         )
     }
 
-    fn image_ndxa() -> (Vec<Vec<RGBA16>>, // restored image
+    fn image_ndxa_8() -> (Vec<Vec<RGBA16>>, // restored image
                        Vec<Vec<u8>>, // @ 0: pal ndx for writer,
                        Vec<RGBA>) { // palette
         let w = 256_usize;
@@ -2168,7 +2212,7 @@ mod tests {
 
     #[test]
     pub fn test_ndx_all() {
-        let (orig, data, pal) = image_ndx();
+        let (orig, data, pal) = image_ndx_8();
 
         let types = vec![
             Filter::None,
@@ -2184,7 +2228,7 @@ mod tests {
             let fname = format!("tmp/ndx_{est:?}.png");
 
             write_apng(&fname,
-                ImageData::NDX(vec![data.clone()], pal.clone()),
+                ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B8),
                 Some(*est),
                 None,
                 false
@@ -2194,15 +2238,15 @@ mod tests {
 
             assert_eq!(back.width, 256);
             assert_eq!(back.height, 196);
-            assert_eq!(back.color_type, ColorType::NDX);
+            assert_eq!(back.color_type, ColorType::NDX(Palette::B8));
             assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone()));
+            assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B8));
         });
     }
 
     #[test]
     pub fn test_ndxa_all() {
-        let (orig, data, pal) = image_ndxa();
+        let (orig, data, pal) = image_ndxa_8();
 
         let types = vec![
             Filter::None,
@@ -2218,7 +2262,7 @@ mod tests {
             let fname = format!("tmp/ndxa_{est:?}.png");
 
             write_apng(&fname,
-                ImageData::NDXA(vec![data.clone()], pal.clone()),
+                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B8),
                 Some(*est),
                 None,
                 false
@@ -2228,9 +2272,9 @@ mod tests {
 
             assert_eq!(back.width, 256);
             assert_eq!(back.height, 196);
-            assert_eq!(back.color_type, ColorType::NDXA);
+            assert_eq!(back.color_type, ColorType::NDXA(Palette::B8));
             assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone()));
+            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B8));
         });
     }
 
