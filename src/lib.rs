@@ -1757,14 +1757,30 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
             let filter = chunk.1[11];// TODO expect 0
             let ilace = chunk.1[12];// NOTE 1 is Adam7
 
-            if depth != 8 && depth != 16 {
-                return Err("unsupported depth".to_string());
+            if color == 3 {
+                match depth {
+                    1 | 2 | 4 | 8 => (),
+                    d => return Err(format!("unsupported color depth for indexed mode: {d}"))
+                }
+            }
+            else {
+                match depth {
+                    8 | 16 => (),
+                    d => return Err(format!("unsupported color depth for RGB(a) mode: {d}"))
+                }
             }
 
             match color {
                 6 => if depth == 8 { color_type = ColorType::RGBA } else { color_type = ColorType::RGBA16 },
                 2 => if depth == 8 { color_type = ColorType::RGB } else { color_type = ColorType::RGB16 },
-                3 => color_type = ColorType::NDX(Palette::B8), // NOTE upgrade to NDXA av
+                3 => 
+                    match depth {
+                        1 => color_type = ColorType::NDX(Palette::B1),
+                        2 => color_type = ColorType::NDX(Palette::B2),
+                        4 => color_type = ColorType::NDX(Palette::B4),
+                        8 => color_type = ColorType::NDX(Palette::B8),
+                        _ => panic!("color depth detection error"),
+                    },
                 c => return Err(format!("color type {c} not supported"))
             }
 
