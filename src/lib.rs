@@ -144,7 +144,7 @@ impl Image {
 ///
 /// # Notes
 ///
-/// Each change takes ownership. This is to avoid unneded memory clones.
+/// Each change takes ownership. This is to avoid unneeded memory clones.
 ///
 /// # Example
 ///
@@ -234,7 +234,7 @@ impl APNGBuilder {
         self
     }
 
-/// Set default repeat duration.
+/// Set default fame duration.
     pub fn set_def_dur(mut self, def_dur: (u16, u16)) -> Self {
         self.def_dur = def_dur;
         self
