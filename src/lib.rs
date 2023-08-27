@@ -1628,9 +1628,17 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
             ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) |
             ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) |
             ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => {
+                let line_width = match color_type {
+                    ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => width,
+                    ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) => (width + 1) / 2,
+                    ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) => (width + 3) / 4,
+                    ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => (width + 7) / 8,
+                    _ => panic!("internal unpack_idat error"),
+                };
+
                 ndx_line = Vec::new();
                 //let mut ndx_line: Vec<u8> = Vec::new();
-                let pal_status = (0 .. width).map(|ox| -> Result<(), String> {
+                let pal_status = (0 .. line_width).map(|ox| -> Result<(), String> {
                     let x = ox;
                     let ndx = add(slice[ox + 1], png_rev(
                             if x < 1 { 0 } else { ndx_line[x - 1]},
@@ -1640,25 +1648,25 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                         )
                     );
 
-                    let unpacked = match color_type {
+                    let (unpacked, top) = match color_type {
                         ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) =>
-                            vec![
+                            (vec![
                                 ndx
-                            ],
+                            ], 1),
                         ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) =>
-                            vec![
+                            (vec![
                                 (ndx >> 4) & 0xf,
                                 ndx & 0xf
-                            ],
+                            ], 2),
                         ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) =>
-                            vec![
+                            (vec![
                                 (ndx >> 6) & 3,
                                 (ndx >> 4) & 3,
                                 (ndx >> 2) & 3,
                                 ndx & 3
-                            ],
+                            ], 4),
                         ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) =>
-                            vec![
+                            (vec![
                                 (ndx >> 7) & 1,
                                 (ndx >> 6) & 1,
                                 (ndx >> 5) & 1,
@@ -1667,11 +1675,15 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                                 (ndx >> 2) & 1,
                                 (ndx >> 1) & 1,
                                 ndx & 1,
-                            ],
+                            ], 8),
                         _ => panic!("internal error @ unpack_idat")
                     };
 
-                    (0 .. width).for_each(|pos| {
+                    (0 .. top).for_each(|pos| {
+                        if line.len() >= width {
+                            return
+                        }
+
                         let ndx1 = unpacked[pos];
 
                         let pix: RGBA16 = (
@@ -1685,14 +1697,14 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                             pix.0,
                             pix.1,
                             pix.2,
-                            if ColorType::NDX(Palette::B8) == color_type {
+                            if let ColorType::NDX(_) = color_type {
                                 0xffff_u16
                             }
                             else {
                                 pix.3
                             }
                         ));
-                        ndx_line.push(ndx);
+                        ndx_line.push(ndx1);
                     });
                     Ok(())
                 }).find(|x| x.is_err());
