@@ -849,7 +849,7 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
 
             let mut so_far: Vec<u8> = vec![];
 
-            let line = if adam_7 && frames.len() == 1 {
+            let mut line = if adam_7 && frames.len() == 1 {
                 let ay = y % ADAM_7_SZ;
                 let mut row: Vec<RGBA16> = Vec::new();
 
@@ -883,6 +883,25 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
             if line.is_empty() {
                 return
             }
+
+            match color_type {
+                ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => {
+                    while (line.len() & 7) != 0 {
+                        line.push((0, 0, 0, 0))
+                    }
+                },
+                ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) => {
+                    while (line.len() & 3) != 0 {
+                        line.push((0, 0, 0, 0))
+                    }
+                },
+                ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) => {
+                    while (line.len() & 1) != 0 {
+                        line.push((0, 0, 0, 0))
+                    }
+                },
+                _ => ()
+            };
 
             if first {
                 match forced {
@@ -1981,10 +2000,12 @@ mod tests {
         (res_orig, res_data)
     }
 
-    fn image_ndx_8() -> (Vec<Vec<RGBA16>>, // restored image
-                       Vec<Vec<u8>>, // @ 0: pal ndx for writer,
-                       Vec<RGB>) { // palette
-        let w = 256_usize;
+    fn image_ndx_8(ps: usize) -> (Vec<Vec<RGBA16>>, // restored image
+                                  Vec<Vec<u8>>, // @ 0: pal ndx for writer,
+                                  Vec<RGB>) { // palette
+        assert!(ps == 2 || ps == 4 || ps == 16 || ps == 256);
+
+        let w = 133_usize;
         let h = 196_usize;
 
         let mut pal = vec![(0, 0, 0); 256];
@@ -2003,7 +2024,7 @@ mod tests {
             let mut data_line: Vec<u8> = Vec::new();
 
             (0 .. w).for_each(|x| {
-                let pndx = (x * y) as u8 as usize;
+                let pndx = ((x + y) % ps as usize) as u8 as usize;
                 data_line.push(pndx as u8);
                 orig_line.push((
                     (pal[pndx].0 as u16) << 8,
@@ -2023,10 +2044,10 @@ mod tests {
         )
     }
 
-    fn image_ndxa_8() -> (Vec<Vec<RGBA16>>, // restored image
-                       Vec<Vec<u8>>, // @ 0: pal ndx for writer,
-                       Vec<RGBA>) { // palette
-        let w = 256_usize;
+    fn image_ndxa_8(ps: usize) -> (Vec<Vec<RGBA16>>, // restored image
+                                   Vec<Vec<u8>>, // @ 0: pal ndx for writer,
+                                   Vec<RGBA>) { // palette
+        let w = 133_usize;
         let h = 196_usize;
 
         let mut pal = vec![(0, 0, 0, 0); 256];
@@ -2046,7 +2067,7 @@ mod tests {
             let mut data_line: Vec<u8> = Vec::new();
 
             (0 .. w).for_each(|x| {
-                let pndx = (x * y) as u8 as usize;
+                let pndx = ((x + y) % ps as usize) as u8 as usize;
                 data_line.push(pndx as u8);
                 orig_line.push((
                     (pal[pndx].0 as u16) << 8,
@@ -2211,8 +2232,8 @@ mod tests {
     }
 
     #[test]
-    pub fn test_ndx_all() {
-        let (orig, data, pal) = image_ndx_8();
+    pub fn test_ndx_8_all() {
+        let (orig, data, pal) = image_ndx_8(256);
 
         let types = vec![
             Filter::None,
@@ -2236,7 +2257,7 @@ mod tests {
 
             let back = read_png(&fname).unwrap();
 
-            assert_eq!(back.width, 256);
+            assert_eq!(back.width, 133);
             assert_eq!(back.height, 196);
             assert_eq!(back.color_type, ColorType::NDX(Palette::B8));
             assert_eq!(back.data, orig);
@@ -2245,8 +2266,8 @@ mod tests {
     }
 
     #[test]
-    pub fn test_ndxa_all() {
-        let (orig, data, pal) = image_ndxa_8();
+    pub fn test_ndxa_8_all() {
+        let (orig, data, pal) = image_ndxa_8(256);
 
         let types = vec![
             Filter::None,
@@ -2270,7 +2291,7 @@ mod tests {
 
             let back = read_png(&fname).unwrap();
 
-            assert_eq!(back.width, 256);
+            assert_eq!(back.width, 133);
             assert_eq!(back.height, 196);
             assert_eq!(back.color_type, ColorType::NDXA(Palette::B8));
             assert_eq!(back.data, orig);
