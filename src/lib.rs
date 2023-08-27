@@ -809,9 +809,17 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
         first = true;
         above = vec![];
 
-        zip(0 .. frame.len(), frame.iter()).for_each(|(y, row_raw)| {
+        if adam_7 {
             if let Some(p) = progress {
-                p(y, frame.len(), "lines");
+                p(a - 1, a_hi - a_lo + 1, "Adam7");
+            }
+        }
+
+        zip(0 .. frame.len(), frame.iter()).for_each(|(y, row_raw)| {
+            if !adam_7 {
+                if let Some(p) = progress {
+                    p(y, frame.len(), "lines");
+                }
             }
 
             let mut so_far: Vec<u8> = vec![];
