@@ -140,6 +140,93 @@ impl Image {
     }
 }
 
+/// APNG Builder structure.
+#[derive(Eq, PartialEq, Debug, Clone)]
+pub struct PNGBuilder {
+    fname: String,
+    image_data: ImageData,
+    forced: Option<Filter>,
+    progress: Option<APNGProgress>,
+    adam_7: bool,
+    repeat: u32,
+    def_dur: (u32, u32),
+    dur: HashMap<u32, (u32, u32)>,
+    meta: HashMap<String, String>,
+    zmeta: HashMap<String, String>
+}
+
+impl PNGBuilder {
+/// Simple builder ctor.
+    pub fn new(fname: &str, image_data: ImageData) -> Self {
+        let mut meta: HashMap<String, String> = HashMap::new();
+
+        meta.insert("Comment".to_string(), "created by nobody / SQ6KBQ".to_string());
+
+        Self {
+            fname: fname.to_string(),
+            image_data,
+            forced: None,
+            progress: None,
+            adam_7: false,
+            repeat: 0,
+            def_dur: (1, 25),
+            dur: HashMap::new(),
+            meta,
+            zmeta: HashMap::new()
+        }
+    }
+
+    pub fn set_filter(&mut self, new_filter: Filter) -> &mut Self {
+        self.forced = Some(new_filter);
+        self
+    }
+
+    pub fn clear_filter(&mut self) -> &mut Self {
+        self.forced = None;
+        self
+    }
+
+    pub fn set_progress(&mut self, new_progress: APNGProgress) -> &mut Self {
+        self.progress = Some(new_progress);
+        self
+    }
+
+    pub fn clear_progress(&mut self) -> &mut Self {
+        self.progress = None;
+        self
+    }
+
+    pub fn set_adam_7(&mut self, adam_7: bool) -> &mut Self {
+        self.adam_7 = adam_7;
+        self
+    }
+
+    pub fn set_repeat(&mut self, repeat: u32) -> &mut Self {
+        self.repeat = repeat;
+        self
+    }
+
+    pub fn set_def_dur(&mut self, def_dur: (u32, u32)) -> &mut Self {
+        self.def_dur = def_dur;
+        self
+    }
+
+    pub fn set_dur(&mut self, frame: u32, dur: (u32, u32)) -> &mut Self {
+        self.dur.insert(frame, dur);
+        self
+    }
+
+    pub fn set_meta(&mut self, key: &str, value: &str) -> &mut Self {
+        self.meta.insert(key.to_string(), value.to_string());
+        self
+    }
+
+    pub fn set_zmeta(&mut self, key: &str, value: &str) -> &mut Self {
+        self.zmeta.insert(key.to_string(), value.to_string());
+        self
+    }
+}
+
 /// Write progress callback.
 pub type APNGProgress = fn (cur: usize, total: usize, descr: &str);
 
@@ -810,6 +897,11 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
     fdat.extend(&c);
 
     png_chunk(&fdat)
+}
+
+/// The complex way to create APNG file.
+pub fn build_apng_u8(builder: &PNGBuilder) -> Result<Vec<u8>, String> {
+    Err(format!("not yet"))
 }
 
 /// Generate APNG bytes. For explanations see [write_apng].
@@ -2023,5 +2115,26 @@ mod tests {
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone()));
         });
+    }
+
+    #[test]
+    pub fn test_meta() {
+        let data: Vec<Vec<RGBA>> = vec![
+            vec![(255, 0, 0, 255), (0, 0, 0, 255)],// the 1st line
+            vec![(0, 0, 0, 255), (255, 0, 0, 255)],// the 2nd line
+        ];
+
+        write_apng("tmp/meta.png",
+            &ImageData::RGBA(vec![data]), // write one frame
+            None ,// automatically select filtering
+            None, // no progress callback
+            false // no Adam-7
+        ).expect("can't save back.png");
+
+        let back = read_png("tmp/meta.png").unwrap();
+        let meta = back.meta();
+
+        assert_eq!(meta["Comment"], "test comment");
+        assert_eq!(meta["Author"], "test author");
     }
 }
