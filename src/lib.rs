@@ -141,21 +141,43 @@ impl Image {
 }
 
 /// APNG Builder structure.
+///
+/// # Notes
+///
+/// Each change takes ownership. This is to avoid unneded memory clones.
+///
+/// # Example
+///
+/// ```rust
+///    use micro_png::{APNGBuilder, build_apng, ImageData, RGBA};
+///
+///    let data: Vec<Vec<RGBA>> = vec![
+///        vec![(255, 0, 0, 255), (0, 0, 0, 255)],// the 1st line
+///        vec![(0, 0, 0, 255), (255, 0, 0, 255)],// the 2nd line
+///    ];
+///
+///    let builder = APNGBuilder::new("tmp/foo.png", ImageData::RGBA(vec![data]))
+///        .set_adam_7(true);
+///
+///    build_apng(builder).unwrap();
+///
+///    // builder variable is not accessible here
+/// ```
 #[derive(Eq, PartialEq, Debug, Clone)]
-pub struct PNGBuilder {
+pub struct APNGBuilder {
     fname: String,
     image_data: ImageData,
     forced: Option<Filter>,
     progress: Option<APNGProgress>,
     adam_7: bool,
     repeat: u32,
-    def_dur: (u32, u32),
-    dur: HashMap<u32, (u32, u32)>,
+    def_dur: (u16, u16),
+    dur: HashMap<u32, (u16, u16)>,
     meta: HashMap<String, String>,
     zmeta: HashMap<String, String>
 }
 
-impl PNGBuilder {
+impl APNGBuilder {
 /// Simple builder ctor.
     pub fn new(fname: &str, image_data: ImageData) -> Self {
         let mut meta: HashMap<String, String> = HashMap::new();
@@ -176,51 +198,61 @@ impl PNGBuilder {
         }
     }
 
+/// Force using a filter.
     pub fn set_filter(mut self, new_filter: Filter) -> Self {
         self.forced = Some(new_filter);
         self
     }
 
+/// Clear using forced filter.
     pub fn clear_filter(mut self) -> Self {
         self.forced = None;
         self
     }
 
+/// Set progress callback.
     pub fn set_progress(mut self, new_progress: APNGProgress) -> Self {
         self.progress = Some(new_progress);
         self
     }
 
+/// Clear progress callback.
     pub fn clear_progress(mut self) -> Self {
         self.progress = None;
         self
     }
 
+/// Set Adam7 flag.
     pub fn set_adam_7(mut self, adam_7: bool) -> Self {
         self.adam_7 = adam_7;
         self
     }
 
+/// Set repeat count.
     pub fn set_repeat(mut self, repeat: u32) -> Self {
         self.repeat = repeat;
         self
     }
 
-    pub fn set_def_dur(mut self, def_dur: (u32, u32)) -> Self {
+/// Set default repeat duration.
+    pub fn set_def_dur(mut self, def_dur: (u16, u16)) -> Self {
         self.def_dur = def_dur;
         self
     }
 
-    pub fn set_dur(mut self, frame: u32, dur: (u32, u32)) -> Self {
+/// Set per frame duration.
+    pub fn set_dur(mut self, frame: u32, dur: (u16, u16)) -> Self {
         self.dur.insert(frame, dur);
         self
     }
 
+/// Set plaintext metadata.
     pub fn set_meta(mut self, key: &str, value: &str) -> Self {
         self.meta.insert(key.to_string(), value.to_string());
         self
     }
 
+/// Set zlibed metadata.
     pub fn set_zmeta(mut self, key: &str, value: &str) -> Self {
         self.zmeta.insert(key.to_string(), value.to_string());
         self
@@ -900,7 +932,7 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
 }
 
 /// The complex way to create APNG file.
-pub fn build_apng_u8(builder: PNGBuilder) -> Result<Vec<u8>, String> {
+pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
     let image_data = &builder.image_data;
     let forced = builder.forced;
     let progress = builder.progress;
@@ -975,15 +1007,11 @@ pub fn build_apng_u8(builder: PNGBuilder) -> Result<Vec<u8>, String> {
         res.extend(png_chunk(&text));
     });
 
-    //let mut text: Vec<u8> = b"tEXt".to_vec();
-    //text.extend(b"Comment\x00created by nobody / SQ6KBQ".to_vec());
-    //res.extend(png_chunk(&text));
-
     if frames.len() > 1 {
         let mut actl: Vec<u8> = b"acTL".to_vec(); // vec![b'a', b'c', b'T', b'L'];
 
         actl.extend((frames.len() as u32).to_be_bytes());
-        actl.extend((0_u32).to_be_bytes()); // NOTE repeats
+        actl.extend(builder.repeat.to_be_bytes());
 
         res.extend(png_chunk(&actl));
         adam_7 = false;
@@ -1017,8 +1045,14 @@ pub fn build_apng_u8(builder: PNGBuilder) -> Result<Vec<u8>, String> {
             fctl.extend((0_u32).to_be_bytes());
             fctl.extend((0_u32).to_be_bytes());
 
-            fctl.extend((1_u16).to_be_bytes());// NOTE delay num
-            fctl.extend((100_u16).to_be_bytes());// NOTE delay den
+            if let Some(d) = builder.dur.get(&ndx) {
+                fctl.extend(d.0.to_be_bytes());
+                fctl.extend(d.1.to_be_bytes());
+            }
+            else {
+                fctl.extend(builder.def_dur.0.to_be_bytes());
+                fctl.extend(builder.def_dur.1.to_be_bytes());
+            }
 
             fctl.extend((0_u8).to_be_bytes());// dispose, 0 - copy
             fctl.extend((1_u8).to_be_bytes());// blend, 1 - over
@@ -1062,139 +1096,21 @@ pub fn build_apng_u8(builder: PNGBuilder) -> Result<Vec<u8>, String> {
 }
 
 /// Generate APNG bytes. For explanations see [write_apng].
-pub fn write_apng_u8(image_data: &ImageData, forced: Option<Filter>, progress: Option<APNGProgress>, mut adam_7: bool)
+pub fn write_apng_u8(image_data: ImageData, forced: Option<Filter>, progress: Option<APNGProgress>, adam_7: bool)
     -> Result<Vec<u8>, String> {
-    let color_type = match image_data {
-        ImageData::RGBA16(_) => ColorType::RGBA16,
-        ImageData::RGB16(_) => ColorType::RGB16,
-        ImageData::RGBA(_) => ColorType::RGBA,
-        ImageData::RGB(_) => ColorType::RGB,
-        ImageData::NDXA(_, _) => ColorType::NDXA,
-        ImageData::NDX(_, _) => ColorType::NDX
-    };
 
-    let frames = prepare_frames(image_data);
+    let mut builder = APNGBuilder::new("", image_data)
+        .set_adam_7(adam_7);
 
-    let mut res: Vec<u8> = vec![];
-
-    res.extend(b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a");
-
-    let mut ihdr: Vec<u8> = b"IHDR".to_vec(); // vec![b'I', b'H', b'D', b'R'];
-
-    let width = frames[0][0].len();
-    let height = frames[0].len();
-
-    ihdr.extend((width as u32).to_be_bytes());
-    ihdr.extend((height as u32).to_be_bytes());
-
-    let color_byte = match color_type {
-        ColorType::RGBA16 => b'\x06',
-        ColorType::RGB16 => b'\x02',
-        ColorType::RGBA => b'\x06',
-        ColorType::RGB => b'\x02',
-        ColorType::NDX => b'\x03',
-        ColorType::NDXA => b'\x03',
-    };
-
-    let bpp = match color_type {
-        ColorType::RGBA16 => b'\x10',
-        ColorType::RGB16 => b'\x10',
-        ColorType::RGBA => b'\x08',
-        ColorType::RGB => b'\x08',
-        ColorType::NDX => b'\x08',
-        ColorType::NDXA => b'\x08',
-    };
-
-    ihdr.append(&mut vec![bpp, color_byte, b'\x00', b'\x00', if adam_7 { b'\x01' } else { b'\x00' }]);
-
-    res.extend(png_chunk(&ihdr));
-
-    res.extend(gen_palette(image_data));
-
-    let mut text: Vec<u8> = b"tEXt".to_vec();
-    text.extend(b"Comment\x00created by nobody / SQ6KBQ".to_vec());
-    res.extend(png_chunk(&text));
-
-    if frames.len() > 1 {
-        let mut actl: Vec<u8> = b"acTL".to_vec(); // vec![b'a', b'c', b'T', b'L'];
-
-        actl.extend((frames.len() as u32).to_be_bytes());
-        actl.extend((0_u32).to_be_bytes()); // NOTE repeats
-
-        res.extend(png_chunk(&actl));
-        adam_7 = false;
+    if let Some(f) = forced {
+        builder = builder.set_filter(f)
     }
-
-    let mut seq = 1_u32;
-
-    let mut stats = Stats::default();
-
-    zip(0 .. frames.len() as u32, frames.iter()).for_each(|(ndx, frame)| {
-        if frames.len() > 1 && progress.is_some() {
-            if let Some(p) = progress {
-                p(ndx as usize, frames.len(), "frames");
-            }
-        }
-
-        if frames.len() > 1 {
-            let mut fctl: Vec<u8> = b"fcTL".to_vec(); // vec![b'f', b'c', b'T', b'L'];
-
-            if ndx > 0 {
-                fctl.extend((seq - 1).to_be_bytes());
-                seq += 1;
-            }
-            else {
-                fctl.extend(ndx.to_be_bytes());
-            }
-
-            fctl.extend((frame[0].len() as u32).to_be_bytes());
-            fctl.extend((frame.len() as u32).to_be_bytes());
-
-            fctl.extend((0_u32).to_be_bytes());
-            fctl.extend((0_u32).to_be_bytes());
-
-            fctl.extend((1_u16).to_be_bytes());// NOTE delay num
-            fctl.extend((100_u16).to_be_bytes());// NOTE delay den
-
-            fctl.extend((0_u8).to_be_bytes());// dispose, 0 - copy
-            fctl.extend((1_u8).to_be_bytes());// blend, 1 - over
-
-            res.extend(png_chunk(&fctl));
-        }
-
-        res.extend(emit_frame(
-            color_type,
-            if frames.len() == 1 {
-                progress
-            }
-            else {
-                None
-            },
-            &mut stats,
-            ndx,
-            forced,
-            &mut seq,
-            &frames,
-            adam_7
-        ));
-    });
-
-    let iend: Vec<u8> = b"IEND".to_vec(); // vec![b'I', b'E', b'N', b'D'];
-
-    res.extend(png_chunk(&iend));
 
     if let Some(p) = progress {
-        if frames.len() > 1 {
-            p(frames.len(), frames.len(),
-                &format!("n:{} / s:{} / u:{} / a:{} / p:{}", stats.n_none, stats.n_sub, stats.n_up, stats.n_avg, stats.n_paeth));
-        }
-        else {
-            p(frames[0].len(), frames[0].len(),
-                                &format!("n:{} / s:{} / u:{} / a:{} / p:{}", stats.n_none, stats.n_sub, stats.n_up, stats.n_avg, stats.n_paeth));
-        }
+        builder = builder.set_progress(p)
     }
 
-    Ok(res)
+    build_apng_u8(builder)
 }
 
 /// Write APNG file. For plain PNG use one frame input.
@@ -1218,13 +1134,13 @@ pub fn write_apng_u8(image_data: &ImageData, forced: Option<Filter>, progress: O
 ///    ];
 ///
 ///    write_apng("tmp/back.png",
-///        &ImageData::RGBA(vec![data]), // write one frame
+///        ImageData::RGBA(vec![data]), // write one frame
 ///        None ,// automatically select filtering
 ///        None, // no progress callback
 ///        false // no Adam-7
 ///    ).expect("can't save back.png");
 /// ```
-pub fn write_apng(fname: &str, image_data: &ImageData, forced: Option<Filter>,
+pub fn write_apng(fname: &str, image_data: ImageData, forced: Option<Filter>,
     progress: Option<APNGProgress>, adam_7: bool) -> Result<(), String> {
     if let Ok(mut f) = File::create(fname) {
         if f.write_all(&write_apng_u8(image_data, forced, progress, adam_7)?).is_err() {
@@ -1240,7 +1156,25 @@ pub fn write_apng(fname: &str, image_data: &ImageData, forced: Option<Filter>,
 }
 
 /// Create the image using builder.
-pub fn build_apng(builder: PNGBuilder) -> Result<Vec<u8>, String> {
+///
+/// # Example
+///
+/// ```rust
+///    use micro_png::*;
+///
+///    let data: Vec<Vec<RGBA>> = vec![
+///        vec![(255, 0, 0, 255), (0, 0, 0, 255)],// the 1st line
+///        vec![(0, 0, 0, 255), (255, 0, 0, 255)],// the 2nd line
+///        vec![(0, 255, 0, 255), (255, 0, 255, 255)],// the 3rd line
+///    ];
+///
+///     build_apng(
+///         APNGBuilder::new("tmp/builder-test.png", ImageData::RGBA(vec![data]))
+///             .set_meta("Comment", "test comment")
+///             .set_zmeta("Author", "test author")
+///     ).expect("can't write tmp/builder-test.png");
+/// ```
+pub fn build_apng(builder: APNGBuilder) -> Result<Vec<u8>, String> {
     let fname = builder.fname.clone();
 
     if let Ok(mut f) = File::create(&fname) {
@@ -1837,19 +1771,19 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
 pub fn read_png(fname: &str) -> Result<Image, String> {
     let mut input = match File::open(fname) {
         Ok(f) => f,
-        Err(_) => return Err("cannot open file".to_string())
+        Err(_) => return Err(format!("cannot open file {fname}"))
     };
 
     let input_len = match fs::metadata(fname) {
         Ok(meta) => meta.len() as usize,
-        Err(_) => return Err("cannot get metadata".to_string())
+        Err(_) => return Err(format!("cannot get metadata {fname}"))
     };
 
     let mut buf: Vec<u8> = vec![0; input_len];
 
     match input.read(&mut buf) {
         Ok(_) => (),
-        Err(_) => return Err("cannot read file".to_string())
+        Err(_) => return Err(format!("cannot read file {fname}"))
     };
 
     read_png_u8(&buf)
@@ -2098,7 +2032,7 @@ mod tests {
             let fname = format!("tmp/rgba_{est:?}.png");
 
             write_apng(&fname,
-                &ImageData::RGBA(vec![image.clone()]),
+                ImageData::RGBA(vec![image.clone()]),
                 Some(*est),
                 None,
                 false
@@ -2133,14 +2067,14 @@ mod tests {
             let fname_a7 = format!("tmp/rgba_16_{est:?}_a7.png");
 
             write_apng(&fname,
-                &ImageData::RGBA16(vec![image.clone()]),
+                ImageData::RGBA16(vec![image.clone()]),
                 Some(*est),
                 None,
                 false
             ).unwrap();
 
             write_apng(&fname_a7,
-                &ImageData::RGBA16(vec![image.clone()]),
+                ImageData::RGBA16(vec![image.clone()]),
                 Some(*est),
                 None,
                 true
@@ -2174,7 +2108,7 @@ mod tests {
             let fname = format!("tmp/rgb_{est:?}.png");
 
             write_apng(&fname,
-                &ImageData::RGB(vec![data.clone()]),
+                ImageData::RGB(vec![data.clone()]),
                 Some(*est),
                 None,
                 false
@@ -2208,7 +2142,7 @@ mod tests {
             let fname = format!("tmp/rgb_16_{est:?}.png");
 
             write_apng(&fname,
-                &ImageData::RGB16(vec![data.clone()]),
+                ImageData::RGB16(vec![data.clone()]),
                 Some(*est),
                 None,
                 false
@@ -2242,7 +2176,7 @@ mod tests {
             let fname = format!("tmp/ndx_{est:?}.png");
 
             write_apng(&fname,
-                &ImageData::NDX(vec![data.clone()], pal.clone()),
+                ImageData::NDX(vec![data.clone()], pal.clone()),
                 Some(*est),
                 None,
                 false
@@ -2276,7 +2210,7 @@ mod tests {
             let fname = format!("tmp/ndxa_{est:?}.png");
 
             write_apng(&fname,
-                &ImageData::NDXA(vec![data.clone()], pal.clone()),
+                ImageData::NDXA(vec![data.clone()], pal.clone()),
                 Some(*est),
                 None,
                 false
@@ -2300,7 +2234,7 @@ mod tests {
         ];
 
         build_apng(
-            PNGBuilder::new("tmp/meta.png", ImageData::RGBA(vec![data]))
+            APNGBuilder::new("tmp/meta.png", ImageData::RGBA(vec![data]))
                 .set_meta("Comment", "test comment")
                 .set_zmeta("Author", "test author")
         ).expect("can't write tmp/meta.png");

@@ -17,7 +17,7 @@ fn main() {
     // now write it back as one-frame image
 
     write_apng("tmp/back.png",
-        &ImageData::RGBA16(vec![data]),
+        ImageData::RGBA16(vec![data]),
         None ,// automatically select filtering
         None, // no progress callback
         false // no Adam-7
@@ -31,7 +31,7 @@ fn main() {
     ];
 
     write_apng("tmp/2x2.png",
-        &ImageData::RGBA(vec![data]), // write one frame
+        ImageData::RGBA(vec![data]), // write one frame
         None ,// automatically select filtering
         None, // no progress callback
         false // no Adam-7
