@@ -42,7 +42,7 @@ const ADAM_7: [usize; 64] = [
 
 const ADAM_7_SZ: usize = 8;
 
-/// Filter mode to use.
+/// Filter mode.
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
 pub enum Filter {
 /// No filter.
@@ -140,7 +140,7 @@ impl Image {
     }
 }
 
-/// APNG Builder structure.
+/// APNG builder structure. For explanations see [build_apng].
 ///
 /// # Notes
 ///
