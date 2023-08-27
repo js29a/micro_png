@@ -812,7 +812,8 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
     png_chunk(&fdat)
 }
 
-fn apng_frames(image_data: &ImageData, forced: Option<Filter>, progress: Option<APNGProgress>, mut adam_7: bool)
+/// Generate APNG bytes. For explanations see [write_apng].
+pub fn write_apng_u8(image_data: &ImageData, forced: Option<Filter>, progress: Option<APNGProgress>, mut adam_7: bool)
     -> Result<Vec<u8>, String> {
     let color_type = match image_data {
         ImageData::RGBA16(_) => ColorType::RGBA16,
@@ -977,7 +978,7 @@ fn apng_frames(image_data: &ImageData, forced: Option<Filter>, progress: Option<
 pub fn write_apng(fname: &str, image_data: &ImageData, forced: Option<Filter>,
     progress: Option<APNGProgress>, adam_7: bool) -> Result<(), String> {
     if let Ok(mut f) = File::create(fname) {
-        if f.write_all(&apng_frames(image_data, forced, progress, adam_7)?).is_err() {
+        if f.write_all(&write_apng_u8(image_data, forced, progress, adam_7)?).is_err() {
             Err("write error".to_string())
         }
         else {
@@ -1337,46 +1338,8 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
     }
 }
 
-/// Read png file.
-///
-/// # Arguments
-///
-/// * `fname` - input filename,
-///
-/// # Example
-///
-/// ```rust
-/// use micro_png::*;
-///
-/// let image = read_png("tmp/test.png").expect("can't load test.png");
-///
-/// println!("{} x {}", image.width(), image.height());
-///
-/// let data = image.data();
-///
-/// (0 .. image.height()).for_each(|y| {
-///   (0 .. image.width()).for_each(|x| {
-///     let _pixel = data[y][x]; // (u16, u16, u16, u16)
-///   });
-/// });
-/// ```
-pub fn read_png(fname: &str) -> Result<Image, String> {
-    let mut input = match File::open(fname) {
-        Ok(f) => f,
-        Err(_) => return Err("cannot open file".to_string())
-    };
-
-    let input_len = match fs::metadata(fname) {
-        Ok(meta) => meta.len() as usize,
-        Err(_) => return Err("cannot get metadata".to_string())
-    };
-
-    let mut buf = vec![0_u8; input_len];
-
-    match input.read_exact(&mut buf) {
-        Ok(_) => (),
-        Err(_) => return Err("cannot read file".to_string())
-    };
+/// Decode PNG. For explanations see [read_png].
+pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
 
     let header: Vec<u8> = b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a".to_vec();
 
@@ -1579,6 +1542,50 @@ pub fn read_png(fname: &str) -> Result<Image, String> {
         meta,
         raw: raw.unwrap()
     })
+}
+
+/// Read png file.
+///
+/// # Arguments
+///
+/// * `fname` - input filename,
+///
+/// # Example
+///
+/// ```rust
+/// use micro_png::*;
+///
+/// let image = read_png("tmp/test.png").expect("can't load test.png");
+///
+/// println!("{} x {}", image.width(), image.height());
+///
+/// let data = image.data();
+///
+/// (0 .. image.height()).for_each(|y| {
+///   (0 .. image.width()).for_each(|x| {
+///     let _pixel = data[y][x]; // (u16, u16, u16, u16)
+///   });
+/// });
+/// ```
+pub fn read_png(fname: &str) -> Result<Image, String> {
+    let mut input = match File::open(fname) {
+        Ok(f) => f,
+        Err(_) => return Err("cannot open file".to_string())
+    };
+
+    let input_len = match fs::metadata(fname) {
+        Ok(meta) => meta.len() as usize,
+        Err(_) => return Err("cannot get metadata".to_string())
+    };
+
+    let mut buf: Vec<u8> = vec![0; input_len];
+
+    match input.read(&mut buf) {
+        Ok(_) => (),
+        Err(_) => return Err("cannot read file".to_string())
+    };
+
+    read_png_u8(&buf)
 }
 
 #[cfg(test)]
