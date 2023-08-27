@@ -176,52 +176,52 @@ impl PNGBuilder {
         }
     }
 
-    pub fn set_filter(&mut self, new_filter: Filter) -> &mut Self {
+    pub fn set_filter(mut self, new_filter: Filter) -> Self {
         self.forced = Some(new_filter);
         self
     }
 
-    pub fn clear_filter(&mut self) -> &mut Self {
+    pub fn clear_filter(mut self) -> Self {
         self.forced = None;
         self
     }
 
-    pub fn set_progress(&mut self, new_progress: APNGProgress) -> &mut Self {
+    pub fn set_progress(mut self, new_progress: APNGProgress) -> Self {
         self.progress = Some(new_progress);
         self
     }
 
-    pub fn clear_progress(&mut self) -> &mut Self {
+    pub fn clear_progress(mut self) -> Self {
         self.progress = None;
         self
     }
 
-    pub fn set_adam_7(&mut self, adam_7: bool) -> &mut Self {
+    pub fn set_adam_7(mut self, adam_7: bool) -> Self {
         self.adam_7 = adam_7;
         self
     }
 
-    pub fn set_repeat(&mut self, repeat: u32) -> &mut Self {
+    pub fn set_repeat(mut self, repeat: u32) -> Self {
         self.repeat = repeat;
         self
     }
 
-    pub fn set_def_dur(&mut self, def_dur: (u32, u32)) -> &mut Self {
+    pub fn set_def_dur(mut self, def_dur: (u32, u32)) -> Self {
         self.def_dur = def_dur;
         self
     }
 
-    pub fn set_dur(&mut self, frame: u32, dur: (u32, u32)) -> &mut Self {
+    pub fn set_dur(mut self, frame: u32, dur: (u32, u32)) -> Self {
         self.dur.insert(frame, dur);
         self
     }
 
-    pub fn set_meta(&mut self, key: &str, value: &str) -> &mut Self {
+    pub fn set_meta(mut self, key: &str, value: &str) -> Self {
         self.meta.insert(key.to_string(), value.to_string());
         self
     }
 
-    pub fn set_zmeta(&mut self, key: &str, value: &str) -> &mut Self {
+    pub fn set_zmeta(mut self, key: &str, value: &str) -> Self {
         self.zmeta.insert(key.to_string(), value.to_string());
         self
     }
@@ -900,8 +900,165 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
 }
 
 /// The complex way to create APNG file.
-pub fn build_apng_u8(builder: &PNGBuilder) -> Result<Vec<u8>, String> {
-    Err(format!("not yet"))
+pub fn build_apng_u8(builder: PNGBuilder) -> Result<Vec<u8>, String> {
+    let image_data = &builder.image_data;
+    let forced = builder.forced;
+    let progress = builder.progress;
+    let mut adam_7 = builder.adam_7;
+
+    let color_type = match image_data {
+        ImageData::RGBA16(_) => ColorType::RGBA16,
+        ImageData::RGB16(_) => ColorType::RGB16,
+        ImageData::RGBA(_) => ColorType::RGBA,
+        ImageData::RGB(_) => ColorType::RGB,
+        ImageData::NDXA(_, _) => ColorType::NDXA,
+        ImageData::NDX(_, _) => ColorType::NDX
+    };
+
+    let frames = prepare_frames(image_data);
+
+    let mut res: Vec<u8> = vec![];
+
+    res.extend(b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a");
+
+    let mut ihdr: Vec<u8> = b"IHDR".to_vec(); // vec![b'I', b'H', b'D', b'R'];
+
+    let width = frames[0][0].len();
+    let height = frames[0].len();
+
+    ihdr.extend((width as u32).to_be_bytes());
+    ihdr.extend((height as u32).to_be_bytes());
+
+    let color_byte = match color_type {
+        ColorType::RGBA16 => b'\x06',
+        ColorType::RGB16 => b'\x02',
+        ColorType::RGBA => b'\x06',
+        ColorType::RGB => b'\x02',
+        ColorType::NDX => b'\x03',
+        ColorType::NDXA => b'\x03',
+    };
+
+    let bpp = match color_type {
+        ColorType::RGBA16 => b'\x10',
+        ColorType::RGB16 => b'\x10',
+        ColorType::RGBA => b'\x08',
+        ColorType::RGB => b'\x08',
+        ColorType::NDX => b'\x08',
+        ColorType::NDXA => b'\x08',
+    };
+
+    ihdr.append(&mut vec![bpp, color_byte, b'\x00', b'\x00', if adam_7 { b'\x01' } else { b'\x00' }]);
+
+    res.extend(png_chunk(&ihdr));
+
+    res.extend(gen_palette(image_data));
+
+    builder.meta.iter().for_each(|(k, v)| {
+        let mut text: Vec<u8> = b"tEXt".to_vec();
+        text.extend(k.bytes());
+        text.extend(b"\x00");
+        text.extend(v.bytes());
+        res.extend(png_chunk(&text));
+    });
+
+    builder.zmeta.iter().for_each(|(k, v)| {
+        let mut text: Vec<u8> = b"zTXt".to_vec();
+        text.extend(k.bytes());
+        text.extend(b"\x00");
+        text.extend(b"\x00");
+
+        let mut e = ZlibEncoder::new(Vec::new(), Compression::best());
+        e.write_all(v.as_bytes()).expect("compress");
+        let c = e.finish().expect("zlib flush");
+        text.extend(c);
+
+        res.extend(png_chunk(&text));
+    });
+
+    //let mut text: Vec<u8> = b"tEXt".to_vec();
+    //text.extend(b"Comment\x00created by nobody / SQ6KBQ".to_vec());
+    //res.extend(png_chunk(&text));
+
+    if frames.len() > 1 {
+        let mut actl: Vec<u8> = b"acTL".to_vec(); // vec![b'a', b'c', b'T', b'L'];
+
+        actl.extend((frames.len() as u32).to_be_bytes());
+        actl.extend((0_u32).to_be_bytes()); // NOTE repeats
+
+        res.extend(png_chunk(&actl));
+        adam_7 = false;
+    }
+
+    let mut seq = 1_u32;
+
+    let mut stats = Stats::default();
+
+    zip(0 .. frames.len() as u32, frames.iter()).for_each(|(ndx, frame)| {
+        if frames.len() > 1 && progress.is_some() {
+            if let Some(p) = progress {
+                p(ndx as usize, frames.len(), "frames");
+            }
+        }
+
+        if frames.len() > 1 {
+            let mut fctl: Vec<u8> = b"fcTL".to_vec(); // vec![b'f', b'c', b'T', b'L'];
+
+            if ndx > 0 {
+                fctl.extend((seq - 1).to_be_bytes());
+                seq += 1;
+            }
+            else {
+                fctl.extend(ndx.to_be_bytes());
+            }
+
+            fctl.extend((frame[0].len() as u32).to_be_bytes());
+            fctl.extend((frame.len() as u32).to_be_bytes());
+
+            fctl.extend((0_u32).to_be_bytes());
+            fctl.extend((0_u32).to_be_bytes());
+
+            fctl.extend((1_u16).to_be_bytes());// NOTE delay num
+            fctl.extend((100_u16).to_be_bytes());// NOTE delay den
+
+            fctl.extend((0_u8).to_be_bytes());// dispose, 0 - copy
+            fctl.extend((1_u8).to_be_bytes());// blend, 1 - over
+
+            res.extend(png_chunk(&fctl));
+        }
+
+        res.extend(emit_frame(
+            color_type,
+            if frames.len() == 1 {
+                progress
+            }
+            else {
+                None
+            },
+            &mut stats,
+            ndx,
+            forced,
+            &mut seq,
+            &frames,
+            adam_7
+        ));
+    });
+
+    let iend: Vec<u8> = b"IEND".to_vec(); // vec![b'I', b'E', b'N', b'D'];
+
+    res.extend(png_chunk(&iend));
+
+    if let Some(p) = progress {
+        if frames.len() > 1 {
+            p(frames.len(), frames.len(),
+                &format!("n:{} / s:{} / u:{} / a:{} / p:{}", stats.n_none, stats.n_sub, stats.n_up, stats.n_avg, stats.n_paeth));
+        }
+        else {
+            p(frames[0].len(), frames[0].len(),
+                                &format!("n:{} / s:{} / u:{} / a:{} / p:{}", stats.n_none, stats.n_sub, stats.n_up, stats.n_avg, stats.n_paeth));
+        }
+    }
+
+    Ok(res)
 }
 
 /// Generate APNG bytes. For explanations see [write_apng].
@@ -1071,14 +1228,31 @@ pub fn write_apng(fname: &str, image_data: &ImageData, forced: Option<Filter>,
     progress: Option<APNGProgress>, adam_7: bool) -> Result<(), String> {
     if let Ok(mut f) = File::create(fname) {
         if f.write_all(&write_apng_u8(image_data, forced, progress, adam_7)?).is_err() {
-            Err("write error".to_string())
+            Err(format!("write error: {fname}"))
         }
         else {
             Ok(())
         }
     }
     else {
-        Err("open error".to_string())
+        Err(format!("open error: {fname}"))
+    }
+}
+
+/// Create the image using builder.
+pub fn build_apng(builder: PNGBuilder) -> Result<Vec<u8>, String> {
+    let fname = builder.fname.clone();
+
+    if let Ok(mut f) = File::create(&fname) {
+        if f.write_all(&build_apng_u8(builder)?).is_err() {
+            Err(format!("write error: {fname}"))
+        }
+        else {
+            Ok(vec![])
+        }
+    }
+    else {
+        Err(format!("open error: {fname}"))
     }
 }
 
@@ -1432,7 +1606,6 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
 
 /// Decode PNG. For explanations see [read_png].
 pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
-
     let header: Vec<u8> = b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a".to_vec();
 
     if header[..] != buf[.. header.len()] {
@@ -1457,6 +1630,8 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
 
     loop {
         let chunk = get_chunk(&buf[offs ..])?;
+
+        #[cfg(debug)]
         println!("{} / {}", chunk.0, chunk.1.len());
 
         offs += chunk.1.len() + 12_usize;// len, crc
@@ -2124,12 +2299,18 @@ mod tests {
             vec![(0, 0, 0, 255), (255, 0, 0, 255)],// the 2nd line
         ];
 
-        write_apng("tmp/meta.png",
-            &ImageData::RGBA(vec![data]), // write one frame
-            None ,// automatically select filtering
-            None, // no progress callback
-            false // no Adam-7
-        ).expect("can't save back.png");
+        build_apng(
+            PNGBuilder::new("tmp/meta.png", ImageData::RGBA(vec![data]))
+                .set_meta("Comment", "test comment")
+                .set_zmeta("Author", "test author")
+        ).expect("can't write tmp/meta.png");
+
+        //write_apng("tmp/meta.png",
+            //&ImageData::RGBA(vec![data]), // write one frame
+            //None ,// automatically select filtering
+            //None, // no progress callback
+            //false // no Adam-7
+        //).expect("can't save back.png");
 
         let back = read_png("tmp/meta.png").unwrap();
         let meta = back.meta();
