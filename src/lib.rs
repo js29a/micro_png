@@ -74,8 +74,13 @@ pub enum ColorType {
     RGBA16
 }
 
-/// Image data. Can be accessed using [Image::raw].
-/// Input for [write_apng].
+/// Image data. Input for [write_apng]. For loaded image can be accessed using [Image::raw].
+///
+/// # Data layout
+///
+/// In descending order: frames then frame rows then row pixels.
+///
+/// See [write_apng] and [read_png] for details.
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub enum ImageData {
 /// 24 bit color mode.
@@ -948,8 +953,8 @@ fn apng_frames(image_data: &ImageData, forced: Option<Filter>, progress: Option<
 ///
 /// * `fname` - output filename,
 /// * `image_data` - the image,
-/// * `forced` - force to use a filter (see [Filter]).
-/// * `progress` - write progress callback (see [APNGProgress]),
+/// * `forced` - force to use a filter,
+/// * `progress` - write progress callback,
 /// * `adam_7` - flag to use Adam7 output.
 ///
 /// # Example
