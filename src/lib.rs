@@ -870,7 +870,7 @@ pub fn write_apng_u8(image_data: &ImageData, forced: Option<Filter>, progress: O
         let mut actl: Vec<u8> = b"acTL".to_vec(); // vec![b'a', b'c', b'T', b'L'];
 
         actl.extend((frames.len() as u32).to_be_bytes());
-        actl.extend((0_u32).to_be_bytes());
+        actl.extend((0_u32).to_be_bytes()); // NOTE repeats
 
         res.extend(png_chunk(&actl));
         adam_7 = false;
@@ -904,11 +904,11 @@ pub fn write_apng_u8(image_data: &ImageData, forced: Option<Filter>, progress: O
             fctl.extend((0_u32).to_be_bytes());
             fctl.extend((0_u32).to_be_bytes());
 
-            fctl.extend((1_u16).to_be_bytes());// delay num
-            fctl.extend((100_u16).to_be_bytes());// delay den
+            fctl.extend((1_u16).to_be_bytes());// NOTE delay num
+            fctl.extend((100_u16).to_be_bytes());// NOTE delay den
 
             fctl.extend((0_u8).to_be_bytes());// dispose, 0 - copy
-            fctl.extend((1_u8).to_be_bytes());// blend, 0 - source, 1 - over
+            fctl.extend((1_u8).to_be_bytes());// blend, 1 - over
 
             res.extend(png_chunk(&fctl));
         }
