@@ -529,12 +529,10 @@ fn png_up(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> Ve
                     sub(((pix.1) >> 8) as u8, (above[x].1 >> 8) as u8),
                     sub(((pix.2) >> 8) as u8, (above[x].2 >> 8) as u8),
                 ],
-            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) =>
+            ColorType::NDXA(_) | ColorType::NDX(_) =>
                 vec![
                     sub(pix.0 as u8, above[x].0 as u8)
                 ],
-            ColorType::NDXA(p) | ColorType::NDX(p) =>
-                panic!("no support for indexed mode: {p:?}")
         }
     }).collect::<Vec<Vec<u8>>>().iter().flatten());
 
@@ -602,11 +600,9 @@ fn png_avg(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> V
                 sub((pix.1 >> 8) as u8, a1h),
                 sub((pix.2 >> 8) as u8, a2h),
             ],
-            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => vec![
+            ColorType::NDXA(_) | ColorType::NDX(_) => vec![
                 sub(pix.0 as u8, a0l),
             ],
-            ColorType::NDXA(p) | ColorType::NDX(p) =>
-                panic!("no support for indexed mode: {p:?}")
         };
 
         prev = *pix;
@@ -710,11 +706,9 @@ fn png_paeth(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) ->
                 sub((pix.1 >> 8) as u8, paeth(a1h, b1h, c1h)),
                 sub((pix.2 >> 8) as u8, paeth(a2h, b2h, c2h)),
             ],
-            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => vec![
+            ColorType::NDXA(_) | ColorType::NDX(_) => vec![
                 sub((pix.0 & 0xff) as u8, paeth(a0l, b0l, c0l)),
             ],
-            ColorType::NDXA(p) | ColorType::NDX(p) =>
-                panic!("no support for indexed mode: {p:?}")
         };
 
         prev = *pix;
@@ -1389,8 +1383,9 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
         ColorType::RGBA => width * 4 + 1,
         ColorType::RGB => width * 3 + 1,
         ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => width + 1,
-        ColorType::NDXA(p) | ColorType::NDX(p) =>
-            panic!("no support for indexed mode: {p:?}")
+        ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) => ((width + 1) / 2) + 1,
+        ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) => ((width + 3) / 4) + 1,
+        ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => ((width + 7) / 8) + 1,
     };
 
     let mut above: Vec<RGBA16> = vec![(0, 0, 0, 0); width];
@@ -1404,8 +1399,9 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
             ColorType::RGBA => (width * 4 + 1) * y,
             ColorType::RGB => (width * 3 + 1) * y,
             ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => (width + 1) * y,
-            ColorType::NDXA(p) | ColorType::NDX(p) =>
-                panic!("no support for indexed mode: {p:?}")
+            ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) => ((width + 1) / 2 + 1) * y,
+            ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) => ((width + 3) / 4 + 1) * y,
+            ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => ((width + 7) / 8 + 1) * y,
         };
         let slice = &raw[offs .. offs + slice_len];
         let mode = slice[0];
@@ -1628,7 +1624,10 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                 });
                 raw_rgb.push(rgb_line);
             },
-            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => {
+            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) |
+            ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) |
+            ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) |
+            ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => {
                 ndx_line = Vec::new();
                 //let mut ndx_line: Vec<u8> = Vec::new();
                 let pal_status = (0 .. width).map(|ox| -> Result<(), String> {
@@ -1640,28 +1639,61 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                             est
                         )
                     );
-                    if ndx as usize >= pal.len() {
-                        return Err("palette overflow".to_string());
-                    }
-                    let pix: RGBA16 = (
-                        (pal[ndx as usize].0 as u16) << 8,
-                        (pal[ndx as usize].1 as u16) << 8,
-                        (pal[ndx as usize].2 as u16) << 8,
-                        (pal[ndx as usize].3 as u16) << 8
-                    );
-                    // HERE - push shifted to left
-                    line.push((
-                        pix.0,
-                        pix.1,
-                        pix.2,
-                        if ColorType::NDX(Palette::B8) == color_type {
-                            0xffff_u16
-                        }
-                        else {
-                            pix.3
-                        }
-                    ));
-                    ndx_line.push(ndx);
+
+                    let unpacked = match color_type {
+                        ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) =>
+                            vec![
+                                ndx
+                            ],
+                        ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) =>
+                            vec![
+                                (ndx >> 4) & 0xf,
+                                ndx & 0xf
+                            ],
+                        ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) =>
+                            vec![
+                                (ndx >> 6) & 3,
+                                (ndx >> 4) & 3,
+                                (ndx >> 2) & 3,
+                                ndx & 3
+                            ],
+                        ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) =>
+                            vec![
+                                (ndx >> 7) & 1,
+                                (ndx >> 6) & 1,
+                                (ndx >> 5) & 1,
+                                (ndx >> 4) & 1,
+                                (ndx >> 3) & 1,
+                                (ndx >> 2) & 1,
+                                (ndx >> 1) & 1,
+                                ndx & 1,
+                            ],
+                        _ => panic!("internal error @ unpack_idat")
+                    };
+
+                    (0 .. width).for_each(|pos| {
+                        let ndx1 = unpacked[pos];
+
+                        let pix: RGBA16 = (
+                            (pal[ndx1 as usize].0 as u16) << 8,
+                            (pal[ndx1 as usize].1 as u16) << 8,
+                            (pal[ndx1 as usize].2 as u16) << 8,
+                            (pal[ndx1 as usize].3 as u16) << 8
+                        );
+
+                        line.push((
+                            pix.0,
+                            pix.1,
+                            pix.2,
+                            if ColorType::NDX(Palette::B8) == color_type {
+                                0xffff_u16
+                            }
+                            else {
+                                pix.3
+                            }
+                        ));
+                        ndx_line.push(ndx);
+                    });
                     Ok(())
                 }).find(|x| x.is_err());
                 if let Some(e) = pal_status {
@@ -1669,8 +1701,6 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                 }
                 raw_ndx.push(ndx_line.clone());
             },
-            ColorType::NDXA(p) | ColorType::NDX(p) =>
-                panic!("no support for indexed mode: {p:?}")
         };
 
         above = line.clone();
@@ -1686,8 +1716,8 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
         ColorType::RGB16 => ImageData::RGB16(vec![raw_rgb16]),
         ColorType::RGBA => ImageData::RGBA(vec![raw_rgba]),
         ColorType::RGB => ImageData::RGB(vec![raw_rgb]),
-        ColorType::NDXA(Palette::B8) => ImageData::NDXA(vec![raw_ndx], pal.clone(), Palette::B8),
-        ColorType::NDX(Palette::B8) => {
+        ColorType::NDXA(p) => ImageData::NDXA(vec![raw_ndx], pal.clone(), p),
+        ColorType::NDX(p) => {
             let pal_rgb: Vec<RGB> = pal.iter().map(|pal| {
                 (
                     pal.0,
@@ -1695,10 +1725,8 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                     pal.2
                 )
             }).collect();
-            ImageData::NDX(vec![raw_ndx], pal_rgb, Palette::B8)
+            ImageData::NDX(vec![raw_ndx], pal_rgb, p)
         },
-        ColorType::NDXA(p) | ColorType::NDX(p) =>
-            panic!("no support for indexed mode: {p:?}")
     };
 
     match status {
@@ -1773,7 +1801,7 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
             match color {
                 6 => if depth == 8 { color_type = ColorType::RGBA } else { color_type = ColorType::RGBA16 },
                 2 => if depth == 8 { color_type = ColorType::RGB } else { color_type = ColorType::RGB16 },
-                3 => 
+                3 =>
                     match depth {
                         1 => color_type = ColorType::NDX(Palette::B1),
                         2 => color_type = ColorType::NDX(Palette::B2),
@@ -1809,8 +1837,9 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                 ColorType::RGBA => (width * 4 + 1) * height,
                 ColorType::RGB => (width * 3 + 1) * height,
                 ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => (width + 1) * height,
-                ColorType::NDXA(p) | ColorType::NDX(p) =>
-                    panic!("no support for indexed mode: {p:?}")
+                ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) => ((width + 1) / 2 + 1) * height,
+                ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) => ((width + 3) / 4 + 1) * height,
+                ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => ((width + 7) / 8 + 1) * height,
             };
 
             if let Err(e) = deco.read_to_end(&mut unpacked) {
