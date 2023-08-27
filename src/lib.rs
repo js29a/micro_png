@@ -324,7 +324,7 @@ fn pack_pix(color_type: ColorType, row: &[RGBA16]) -> Vec<RGBA16> {
             (0 .. row.len()).step_by(2).for_each(|ndx| {
                 res.push((
                       ((row[ndx    ].0 & 15) << 4)
-                    | ((row[ndx + 1].0 & 15)     ),
+                    | ( row[ndx + 1].0 & 15      ),
                     0,
                     0,
                     0
@@ -340,7 +340,7 @@ fn pack_pix(color_type: ColorType, row: &[RGBA16]) -> Vec<RGBA16> {
                       ((row[ndx    ].0 & 3) << 6)
                     | ((row[ndx + 1].0 & 3) << 4)
                     | ((row[ndx + 2].0 & 3) << 2)
-                    | ((row[ndx + 3].0 & 3)     ),
+                    | ( row[ndx + 3].0 & 3      ),
                     0,
                     0,
                     0
@@ -360,7 +360,7 @@ fn pack_pix(color_type: ColorType, row: &[RGBA16]) -> Vec<RGBA16> {
                     | ((row[ndx + 4].0 & 1) << 3)
                     | ((row[ndx + 5].0 & 1) << 2)
                     | ((row[ndx + 6].0 & 1) << 1)
-                    | ((row[ndx + 7].0 & 1)     ),
+                    | ( row[ndx + 7].0 & 1      ),
                     0,
                     0,
                     0
@@ -1368,7 +1368,7 @@ fn get_chunk(inp: &[u8]) -> Result<(String, &[u8]), String> {
     Ok((code, &inp[8 .. 8 + length]))
 }
 
-fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, pal: &Vec<RGBA>) -> Result<(Vec<Vec<RGBA16>>, ImageData), String> {
+fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, pal: &[RGBA]) -> Result<(Vec<Vec<RGBA16>>, ImageData), String> {
     let mut res: Vec<Vec<RGBA16>> = Vec::new();
 
     let mut raw_rgba16: Vec<Vec<RGBA16>> = Vec::new();
@@ -1731,7 +1731,7 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
         ColorType::RGB16 => ImageData::RGB16(vec![raw_rgb16]),
         ColorType::RGBA => ImageData::RGBA(vec![raw_rgba]),
         ColorType::RGB => ImageData::RGB(vec![raw_rgb]),
-        ColorType::NDXA(p) => ImageData::NDXA(vec![raw_ndx], pal.clone(), p),
+        ColorType::NDXA(p) => ImageData::NDXA(vec![raw_ndx], pal.to_vec(), p),
         ColorType::NDX(p) => {
             let pal_rgb: Vec<RGB> = pal.iter().map(|pal| {
                 (
