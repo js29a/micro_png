@@ -323,8 +323,8 @@ fn pack_pix(color_type: ColorType, row: &[RGBA16]) -> Vec<RGBA16> {
             let mut res: Vec<RGBA16> = Vec::new();
             (0 .. row.len()).step_by(2).for_each(|ndx| {
                 res.push((
-                      ((row[ndx    ].0 & 7) << 4)
-                    | ((row[ndx + 1].0 & 7)     ),
+                      ((row[ndx    ].0 & 15) << 4)
+                    | ((row[ndx + 1].0 & 15)     ),
                     0,
                     0,
                     0
@@ -421,11 +421,17 @@ fn png_none(row_raw: &[RGBA16], _above: &[RGBA16], color_type: ColorType) -> Vec
     res
 }
 
-fn png_sub(row: &[RGBA16], _above: &[RGBA16], color_type: ColorType) -> Vec<u8> {
+fn png_sub(row_raw: &[RGBA16], _above: &[RGBA16], color_type: ColorType) -> Vec<u8> {
     let mut res: Vec<u8> = Vec::new();
     let mut prev: RGBA16 = (0, 0, 0, 0);
 
     res.push(1_u8);
+
+    let row = match color_type {
+        ColorType::NDXA(_) | ColorType::NDX(_) =>
+            pack_pix(color_type, row_raw),
+        _ => row_raw.to_vec(),
+    };
 
     res.extend(row.iter().map(|pix| {
         let r = match color_type {
@@ -460,11 +466,9 @@ fn png_sub(row: &[RGBA16], _above: &[RGBA16], color_type: ColorType) -> Vec<u8> 
                 sub((pix.1 >> 8) as u8, (prev.1 >> 8) as u8),
                 sub((pix.2 >> 8) as u8, (prev.2 >> 8) as u8)
             ],
-            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => vec![
+            ColorType::NDXA(_) | ColorType::NDX(_) => vec![
                 sub((pix.0 & 0xff) as u8, (prev.0 & 0xff) as u8),
             ],
-            ColorType::NDXA(p) | ColorType::NDX(p) =>
-                panic!("no support for indexed mode: {p:?}")
         };
         prev = *pix;
         r
@@ -473,10 +477,22 @@ fn png_sub(row: &[RGBA16], _above: &[RGBA16], color_type: ColorType) -> Vec<u8> 
     res
 }
 
-fn png_up(row: &[RGBA16], above: &[RGBA16], color_type: ColorType) -> Vec<u8> {
+fn png_up(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> Vec<u8> {
     let mut res: Vec<u8> = Vec::new();
 
     res.push(2_u8);
+
+    let row = match color_type {
+        ColorType::NDXA(_) | ColorType::NDX(_) =>
+            pack_pix(color_type, row_raw),
+        _ => row_raw.to_vec(),
+    };
+
+    let above = match color_type {
+        ColorType::NDXA(_) | ColorType::NDX(_) =>
+            pack_pix(color_type, above_raw),
+        _ => above_raw.to_vec(),
+    };
 
     res.extend(zip(0 .. row.len(), row.iter()).map(|(x, pix)| {
         match color_type {
@@ -525,13 +541,25 @@ fn png_up(row: &[RGBA16], above: &[RGBA16], color_type: ColorType) -> Vec<u8> {
     res
 }
 
-fn png_avg(row: &[RGBA16], above: &[RGBA16], color_type: ColorType) -> Vec<u8> {
-    assert_eq!(row.len(), above.len());
+fn png_avg(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> Vec<u8> {
+    assert_eq!(row_raw.len(), above_raw.len());
 
     let mut res: Vec<u8> = Vec::new();
     let mut prev: RGBA16 = (0, 0, 0, 0);
 
     res.push(3_u8);
+
+    let row = match color_type {
+        ColorType::NDXA(_) | ColorType::NDX(_) =>
+            pack_pix(color_type, row_raw),
+        _ => row_raw.to_vec(),
+    };
+
+    let above = match color_type {
+        ColorType::NDXA(_) | ColorType::NDX(_) =>
+            pack_pix(color_type, above_raw),
+        _ => above_raw.to_vec(),
+    };
 
     res.extend(zip(0 .. row.len(), row.iter()).map(|(x, pix)| {
         let a0h = (((prev.0 >> 8)  + (above[x].0 >> 8)) >> 1) as u8;
@@ -588,13 +616,25 @@ fn png_avg(row: &[RGBA16], above: &[RGBA16], color_type: ColorType) -> Vec<u8> {
     res
 }
 
-fn png_paeth(row: &[RGBA16], above: &[RGBA16], color_type: ColorType) -> Vec<u8> {
-    assert_eq!(row.len(), above.len());
+fn png_paeth(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> Vec<u8> {
+    assert_eq!(row_raw.len(), above_raw.len());
 
     let mut res: Vec<u8> = Vec::new();
     let mut prev: RGBA16 = (0, 0, 0, 0);
 
     res.push(4_u8);
+
+    let row = match color_type {
+        ColorType::NDXA(_) | ColorType::NDX(_) =>
+            pack_pix(color_type, row_raw),
+        _ => row_raw.to_vec(),
+    };
+
+    let above = match color_type {
+        ColorType::NDXA(_) | ColorType::NDX(_) =>
+            pack_pix(color_type, above_raw),
+        _ => above_raw.to_vec(),
+    };
 
     res.extend(zip(0 .. row.len(), row.iter()).map(|(x, pix)| {
         let a0 = prev.0;
