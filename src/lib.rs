@@ -14,12 +14,19 @@ use flate2::read::ZlibDecoder;
 use crc32fast::Hasher;
 use quicklz::{compress, CompressionLevel};
 
+/// RGB 8 bits.
 pub type RGB = (u8, u8, u8);
+
+/// RGB + Alpha 8 bits.
 pub type RGBA = (u8, u8, u8, u8);
 
+/// RGB 16 bits.
 pub type RGB16 = (u16, u16, u16);
+
+/// RGB + Alpha 16 bits.
 pub type RGBA16 = (u16, u16, u16, u16);
 
+/// Palette index.
 pub type NDX = u8;
 
 const ADAM_7: [usize; 64] = [
@@ -35,35 +42,57 @@ const ADAM_7: [usize; 64] = [
 
 const ADAM_7_SZ: usize = 8;
 
+/// Filter mode to use.
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
-pub enum PkEst {
+pub enum Filter {
+/// No filter.
     None,
+/// Pixel on left filter.
     Sub,
+/// Pixel above filter.
     Up,
+/// Average of pixel above and pixel on left.
     Avg,
+/// Paeth filter.
     Paeth
 }
 
+/// Color type.
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
 pub enum ColorType {
-    RGB16,
-    RGBA16,
+/// RGB 8 bits - [ImageData::RGB].
     RGB,
+/// RGB + Alpha 8 bits - [ImageData::RGBA].
     RGBA,
+/// Indexed mode - 256 colors - [ImageData::NDX].
     NDX,
-    NDXA
+/// Indexed mode + Alpha - 256 colors - [ImageData::NDXA].
+    NDXA,
+/// RGB 16 bits - [ImageData::RGB16].
+    RGB16,
+/// RGB + Alpha 16 bits - [ImageData::RGBA16].
+    RGBA16
 }
 
+/// Image data. Can be accessed using [Image::raw].
+/// Input for [write_apng].
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub enum ImageData {
-    RGBA16(Vec<Vec<Vec<RGBA16>>>),
-    RGB16(Vec<Vec<Vec<RGB16>>>),
-    RGBA(Vec<Vec<Vec<RGBA>>>),
+/// 24 bit color mode.
     RGB(Vec<Vec<Vec<RGB>>>),
+/// 32 bit color mode.
+    RGBA(Vec<Vec<Vec<RGBA>>>),
+/// 256-color palette without Alpha.
     NDX(Vec<Vec<Vec<NDX>>>, Vec<RGB>),
-    NDXA(Vec<Vec<Vec<NDX>>>, Vec<RGBA>)
+/// 256-color palette with Alpha for each palette entry.
+    NDXA(Vec<Vec<Vec<NDX>>>, Vec<RGBA>),
+/// 48 bit color mode.
+    RGB16(Vec<Vec<Vec<RGB16>>>),
+/// 64 bit color mode.
+    RGBA16(Vec<Vec<Vec<RGBA16>>>),
 }
 
+/// Image structure.
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct Image {
     color_type: ColorType,
@@ -75,34 +104,41 @@ pub struct Image {
 }
 
 impl Image {
+/// Color type getter.
     pub fn color_type(&self) -> ColorType {
         self.color_type
     }
 
+/// Image width getter.
     pub fn width(&self) -> usize {
         self.width
     }
 
+/// Image height getter.
     pub fn height(&self) -> usize {
         self.height
     }
 
+/// Image data getter - always RGB + Alpha 16 bits.
     pub fn data(&self) -> Vec<Vec<RGBA16>> {
         self.data.clone()
     }
 
+/// Raw image data getter.
     pub fn raw(&self) -> &ImageData {
         &self.raw
     }
 
+/// Image metadata getter.
     pub fn meta(&self) -> &HashMap<String, String> {
         &self.meta
     }
 }
 
+/// Write progress callback.
 pub type APNGProgress = fn (cur: usize, total: usize, descr: &str);
 
-pub type Pred = fn (line: &[RGBA16], above: &[RGBA16], color_type: ColorType) -> Vec<u8>;
+type Pred = fn (line: &[RGBA16], above: &[RGBA16], color_type: ColorType) -> Vec<u8>;
 
 fn sub(a: u8, b: u8) -> u8 {
     (a as i16 - b as i16) as u8
@@ -439,13 +475,13 @@ fn png_paeth(row: &[RGBA16], above: &[RGBA16], color_type: ColorType) -> Vec<u8>
     res
 }
 
-fn png_rev(left: u8, up: u8, corner: u8, est: PkEst) -> u8 {
+fn png_rev(left: u8, up: u8, corner: u8, est: Filter) -> u8 {
     match est {
-        PkEst::None => 0,
-        PkEst::Sub => left,
-        PkEst::Up => up,
-        PkEst::Avg => ((left as u16 + up as u16) >> 1) as u8,
-        PkEst::Paeth => paeth(left, up, corner)
+        Filter::None => 0,
+        Filter::Sub => left,
+        Filter::Up => up,
+        Filter::Avg => ((left as u16 + up as u16) >> 1) as u8,
+        Filter::Paeth => paeth(left, up, corner)
     }
 }
 
@@ -453,7 +489,7 @@ fn pk_size(payload: &[u8]) -> usize {
     compress(payload, CompressionLevel::Lvl1).len() // NOTE quick estimation
 }
 
-async fn estimate_worker(est: PkEst, so_far: Vec<u8>, payload: Vec<u8>) -> (PkEst, usize, Vec<u8>) {
+async fn estimate_worker(est: Filter, so_far: Vec<u8>, payload: Vec<u8>) -> (Filter, usize, Vec<u8>) {
     async fn doit(_so_far: Vec<u8>, payload: Vec<u8>) -> usize {
         pk_size(&payload[..])
     }
@@ -461,8 +497,8 @@ async fn estimate_worker(est: PkEst, so_far: Vec<u8>, payload: Vec<u8>) -> (PkEs
     (est, spawn(doit(so_far, payload.clone())).await, payload)
 }
 
-fn elect_best(preds: &[(PkEst, Pred)], so_far: Vec<u8>, line: &[RGBA16], above: &[RGBA16], color_type: ColorType) ->
-    (PkEst, Vec<u8>) {
+fn elect_best(preds: &[(Filter, Pred)], so_far: Vec<u8>, line: &[RGBA16], above: &[RGBA16], color_type: ColorType) ->
+    (Filter, Vec<u8>) {
 
     let tasks = preds.iter().map(|(id, func)| {
         estimate_worker(*id, so_far.clone(), func(line, above, color_type))
@@ -470,7 +506,7 @@ fn elect_best(preds: &[(PkEst, Pred)], so_far: Vec<u8>, line: &[RGBA16], above: 
 
     let output = futures_executor::block_on(join_all(tasks));
 
-    let mut best = PkEst::None;
+    let mut best = Filter::None;
     let mut bsize = output[0].1;
     let mut bpayload: Vec<u8> = output[0].2.clone();
 
@@ -609,20 +645,20 @@ struct Stats {
 
 #[allow(clippy::too_many_arguments)]
 fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
-    stats: &mut Stats, ndx: u32, forced: Option<PkEst>, seq: &mut u32, frames: &Vec<Vec<Vec<RGBA16>>>,
+    stats: &mut Stats, ndx: u32, forced: Option<Filter>, seq: &mut u32, frames: &Vec<Vec<Vec<RGBA16>>>,
     adam_7: bool) -> Vec<u8> {
 
-    let preds_first: Vec<(PkEst, Pred)> = vec![
-        (PkEst::None, png_none),
-        (PkEst::Sub, png_sub)
+    let preds_first: Vec<(Filter, Pred)> = vec![
+        (Filter::None, png_none),
+        (Filter::Sub, png_sub)
     ];
 
-    let preds_next: Vec<(PkEst, Pred)> = vec![
-        (PkEst::None, png_none),
-        (PkEst::Sub, png_sub),
-        (PkEst::Up, png_up),
-        (PkEst::Avg, png_avg),
-        (PkEst::Paeth, png_paeth)
+    let preds_next: Vec<(Filter, Pred)> = vec![
+        (Filter::None, png_none),
+        (Filter::Sub, png_sub),
+        (Filter::Up, png_up),
+        (Filter::Avg, png_avg),
+        (Filter::Paeth, png_paeth)
     ];
 
     let mut payload: Vec<u8> = Vec::new();
@@ -693,7 +729,7 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
 
             if first {
                 match forced {
-                    Some(PkEst::None) => {
+                    Some(Filter::None) => {
                         let p_none = png_none(&line[..], &[], color_type);
                         payload.extend(&p_none);
                         stats.n_none += 1;
@@ -710,8 +746,8 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
                         payload.extend(bpayload);
 
                         match best {
-                            PkEst::None => stats.n_none += 1,
-                            PkEst::Sub => stats.n_sub += 1,
+                            Filter::None => stats.n_none += 1,
+                            Filter::Sub => stats.n_sub += 1,
                             _ => panic!("pred elect @ one line: failure")
                         }
                     }
@@ -720,23 +756,23 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
             }
             else {
                 match forced {
-                    Some(PkEst::None) => {
+                    Some(Filter::None) => {
                         stats.n_none += 1;
                         payload.extend(png_none(&line[..], &above[..], color_type));
                     },
-                    Some(PkEst::Sub) => {
+                    Some(Filter::Sub) => {
                         stats.n_sub += 1;
                         payload.extend(png_sub(&line[..], &above[..], color_type));
                     },
-                    Some(PkEst::Up) => {
+                    Some(Filter::Up) => {
                         stats.n_up += 1;
                         payload.extend(png_up(&line[..], &above[..], color_type));
                     },
-                    Some(PkEst::Avg) => {
+                    Some(Filter::Avg) => {
                         stats.n_avg += 1;
                         payload.extend(png_avg(&line[..], &above[..], color_type));
                     },
-                    Some(PkEst::Paeth) => {
+                    Some(Filter::Paeth) => {
                         stats.n_paeth += 1;
                         payload.extend(png_paeth(&line[..], &above[..], color_type));
                     },
@@ -747,11 +783,11 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
                         payload.extend(bpayload);
 
                         match best {
-                            PkEst::None => stats.n_none += 1,
-                            PkEst::Sub => stats.n_sub += 1,
-                            PkEst::Up => stats.n_up += 1,
-                            PkEst::Avg => stats.n_avg += 1,
-                            PkEst::Paeth => stats.n_paeth += 1
+                            Filter::None => stats.n_none += 1,
+                            Filter::Sub => stats.n_sub += 1,
+                            Filter::Up => stats.n_up += 1,
+                            Filter::Avg => stats.n_avg += 1,
+                            Filter::Paeth => stats.n_paeth += 1
                         }
                     }
                 }
@@ -771,7 +807,7 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
     png_chunk(&fdat)
 }
 
-fn apng_frames(image_data: &ImageData, forced: Option<PkEst>, progress: Option<APNGProgress>, mut adam_7: bool)
+fn apng_frames(image_data: &ImageData, forced: Option<Filter>, progress: Option<APNGProgress>, mut adam_7: bool)
     -> Result<Vec<u8>, String> {
     let color_type = match image_data {
         ImageData::RGBA16(_) => ColorType::RGBA16,
@@ -906,7 +942,34 @@ fn apng_frames(image_data: &ImageData, forced: Option<PkEst>, progress: Option<A
     Ok(res)
 }
 
-pub fn write_apng(fname: &str, image_data: &ImageData, forced: Option<PkEst>,
+/// Write APNG file. For plain PNG use one frame input.
+///
+/// # Arguments
+///
+/// * `fname` - output filename,
+/// * `image_data` - the image,
+/// * `forced` - force to use a filter (see [Filter]).
+/// * `progress` - write progress callback (see [APNGProgress]),
+/// * `adam_7` - flag to use Adam7 output.
+///
+/// # Example
+///
+/// ```rust
+///    use micro_png::*;
+///
+///    let data: Vec<Vec<RGBA>> = vec![
+///        vec![(255, 0, 0, 255), (0, 0, 0, 255)],// the 1st line
+///        vec![(0, 0, 0, 255), (255, 0, 0, 255)],// the 2nd line
+///    ];
+///
+///    write_apng("tmp/back.png",
+///        &ImageData::RGBA(vec![data]), // write one frame
+///        None ,// automatically select filtering
+///        None, // no progress callback
+///        false // no Adam-7
+///    ).expect("can't save back.png");
+/// ```
+pub fn write_apng(fname: &str, image_data: &ImageData, forced: Option<Filter>,
     progress: Option<APNGProgress>, adam_7: bool) -> Result<(), String> {
     if let Ok(mut f) = File::create(fname) {
         if f.write_all(&apng_frames(image_data, forced, progress, adam_7)?).is_err() {
@@ -977,11 +1040,11 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
         let mut line: Vec<RGBA16> = Vec::new();
 
         let est = match mode {
-            0 => PkEst::None,
-            1 => PkEst::Sub,
-            2 => PkEst::Up,
-            3 => PkEst::Avg,
-            4 => PkEst::Paeth,
+            0 => Filter::None,
+            1 => Filter::Sub,
+            2 => Filter::Up,
+            3 => Filter::Avg,
+            4 => Filter::Paeth,
             e => return Err(format!("bad est: {e}"))
         };
 
@@ -1269,6 +1332,29 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
     }
 }
 
+/// Read png file.
+///
+/// # Arguments
+///
+/// * `fname` - input filename,
+///
+/// # Example
+///
+/// ```rust
+/// use micro_png::*;
+///
+/// let image = read_png("tmp/test.png").expect("can't load test.png");
+///
+/// println!("{} x {}", image.width(), image.height());
+///
+/// let data = image.data();
+///
+/// (0 .. image.height()).for_each(|y| {
+///   (0 .. image.width()).for_each(|x| {
+///     let _pixel = data[y][x]; // (u16, u16, u16, u16)
+///   });
+/// });
+/// ```
 pub fn read_png(fname: &str) -> Result<Image, String> {
     let mut input = match File::open(fname) {
         Ok(f) => f,
@@ -1720,11 +1806,11 @@ mod tests {
         let (orig, image) = image_rgba();
 
         let types = vec![
-            PkEst::None,
-            PkEst::Sub,
-            PkEst::Up,
-            PkEst::Avg,
-            PkEst::Paeth
+            Filter::None,
+            Filter::Sub,
+            Filter::Up,
+            Filter::Avg,
+            Filter::Paeth
         ];
 
         types.iter().for_each(|est| {
@@ -1754,11 +1840,11 @@ mod tests {
         let (orig, image) = image_rgba_16();
 
         let types = vec![
-            PkEst::None,
-            PkEst::Sub,
-            PkEst::Up,
-            PkEst::Avg,
-            PkEst::Paeth
+            Filter::None,
+            Filter::Sub,
+            Filter::Up,
+            Filter::Avg,
+            Filter::Paeth
         ];
 
         types.iter().for_each(|est| {
@@ -1796,11 +1882,11 @@ mod tests {
         let (orig, data) = image_rgb();
 
         let types = vec![
-            PkEst::None,
-            PkEst::Sub,
-            PkEst::Up,
-            PkEst::Avg,
-            PkEst::Paeth
+            Filter::None,
+            Filter::Sub,
+            Filter::Up,
+            Filter::Avg,
+            Filter::Paeth
         ];
 
         types.iter().for_each(|est| {
@@ -1830,11 +1916,11 @@ mod tests {
         let (orig, data) = image_rgb_16();
 
         let types = vec![
-            PkEst::None,
-            PkEst::Sub,
-            PkEst::Up,
-            PkEst::Avg,
-            PkEst::Paeth
+            Filter::None,
+            Filter::Sub,
+            Filter::Up,
+            Filter::Avg,
+            Filter::Paeth
         ];
 
         types.iter().for_each(|est| {
@@ -1864,11 +1950,11 @@ mod tests {
         let (orig, data, pal) = image_ndx();
 
         let types = vec![
-            PkEst::None,
-            PkEst::Sub,
-            PkEst::Up,
-            PkEst::Avg,
-            PkEst::Paeth
+            Filter::None,
+            Filter::Sub,
+            Filter::Up,
+            Filter::Avg,
+            Filter::Paeth
         ];
 
         types.iter().for_each(|est| {
@@ -1898,11 +1984,11 @@ mod tests {
         let (orig, data, pal) = image_ndxa();
 
         let types = vec![
-            PkEst::None,
-            PkEst::Sub,
-            PkEst::Up,
-            PkEst::Avg,
-            PkEst::Paeth
+            Filter::None,
+            Filter::Sub,
+            Filter::Up,
+            Filter::Avg,
+            Filter::Paeth
         ];
 
         types.iter().for_each(|est| {

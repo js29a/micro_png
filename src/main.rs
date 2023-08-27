@@ -1,4 +1,4 @@
-use micro_png::{read_png, write_apng, ImageData};
+use micro_png::{read_png, write_apng, ImageData, RGBA};
 
 fn main() {
     // load an image
@@ -18,6 +18,20 @@ fn main() {
 
     write_apng("back.png",
         &ImageData::RGBA16(vec![data]),
+        None ,// automatically select filtering
+        None, // no progress callback
+        false // no Adam-7
+    ).expect("can't save back.png");
+
+    // write 2x2 pattern image
+
+    let data: Vec<Vec<RGBA>> = vec![
+        vec![(255, 0, 0, 255), (0, 0, 0, 255)],// the 1st line
+        vec![(0, 0, 0, 255), (255, 0, 0, 255)],// the 2nd line
+    ];
+
+    write_apng("2x2.png",
+        &ImageData::RGBA(vec![data]), // write one frame
         None ,// automatically select filtering
         None, // no progress callback
         false // no Adam-7
