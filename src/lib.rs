@@ -29,7 +29,7 @@ pub type RGBA16 = (u16, u16, u16, u16);
 /// Palette index.
 pub type NDX = u8;
 
-/// Palette type.
+/// Palette type (see [ImageData::NDX] and [ImageData::NDXA]).
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
 pub enum Palette {
 /// One-bit palette - 2 colors.
@@ -42,7 +42,7 @@ pub enum Palette {
     P8
 }
 
-/// Grayscale bits count.
+/// Grayscale bits count (see [ImageData::GRAY] and [ImageData::GRAYA]).
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
 pub enum Grayscale {
 /// Eigth-bit - 256 levels.
