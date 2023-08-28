@@ -407,6 +407,12 @@ fn png_none(row_raw: &[RGBA16], _above: &[RGBA16], color_type: ColorType) -> Vec
     res.push(0_u8);
 
     let row = match color_type {
+        ColorType::GRAYA(Grayscale::G4) |
+        ColorType::GRAY(Grayscale::G4) |
+        ColorType::GRAYA(Grayscale::G2) |
+        ColorType::GRAY(Grayscale::G2) |
+        ColorType::GRAYA(Grayscale::G1) |
+        ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, row_raw),
         _ => row_raw.to_vec(),
@@ -1562,11 +1568,11 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
         ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => ((width + 3) / 4) + 1,
         ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) / 8) + 1,
 
-        ColorType::GRAY(Grayscale::G1) => ((width + 7) / 8 + 1),
-        ColorType::GRAYA(Grayscale::G1) =>  ((width + 3) / 4 + 1),
-        ColorType::GRAY(Grayscale::G2) =>  ((width + 3) / 4 + 1),
-        ColorType::GRAYA(Grayscale::G2) =>  ((width + 2) / 2 + 1),
-        ColorType::GRAY(Grayscale::G4) =>  ((width + 1) / 2 + 1),
+        ColorType::GRAY(Grayscale::G1) => (width + 7) / 8 + 1,
+        ColorType::GRAYA(Grayscale::G1) =>  (width + 3) / 4 + 1,
+        ColorType::GRAY(Grayscale::G2) =>  (width + 3) / 4 + 1,
+        ColorType::GRAYA(Grayscale::G2) =>  (width + 2) / 2 + 1,
+        ColorType::GRAY(Grayscale::G4) =>  (width + 1) / 2 + 1,
         ColorType::GRAYA(Grayscale::G4) =>  width + 1,
 
         ColorType::GRAY(Grayscale::G8) => width + 1,
@@ -1592,11 +1598,11 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
             ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => ((width + 1) / 2 + 1) * y,
             ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => ((width + 3) / 4 + 1) * y,
             ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) / 8 + 1) * y,
-            ColorType::GRAY(Grayscale::G1) => ((width + 7) / 8 + 1),
-            ColorType::GRAYA(Grayscale::G1) => ((width + 3) / 4 + 1),
-            ColorType::GRAY(Grayscale::G2) => ((width + 3) / 4 + 1),
-            ColorType::GRAYA(Grayscale::G2) =>  ((width + 1) / 2 + 1),
-            ColorType::GRAY(Grayscale::G4) => ((width + 1) / 2 + 1),
+            ColorType::GRAY(Grayscale::G1) => (width + 7) / 8 + 1,
+            ColorType::GRAYA(Grayscale::G1) => (width + 3) / 4 + 1,
+            ColorType::GRAY(Grayscale::G2) => (width + 3) / 4 + 1,
+            ColorType::GRAYA(Grayscale::G2) =>  (width + 1) / 2 + 1,
+            ColorType::GRAY(Grayscale::G4) => (width + 1) / 2 + 1,
             ColorType::GRAYA(Grayscale::G4) => (width + 1) * y,
             ColorType::GRAY(Grayscale::G8) => (width + 1) * y,
             ColorType::GRAYA(Grayscale::G8) => (width * 2 + 1) * y,
