@@ -89,13 +89,15 @@ supported formats
 | ImageData::RGBA16 | 16-bit RGB with alpha               |
 | ImageData::NDX    | n-bit indexed palette without alpha |
 | ImageData::NDXA   | n-bit indexed palette with alpha    |
+| ImageData::GRAY   | k-bit grayscale without alpha       |
+| ImageData::GRAYA  | k-bit grayscale with alpha          |
 
-where n is 1, 2, 4 or 8
+where n is 1, 2, 4 or 8 and k is 8
 
 todo
 ====
 
-- grayscale I/O,
+- grayscale I/O for 1, 2, 4, 16 bpp,
 - Adam-7 input,
 - APNG input,
 
