@@ -391,12 +391,105 @@ fn pack_pix(color_type: ColorType, row: &[RGBA16]) -> Vec<RGBA16> {
             });
             res
         },
-        ColorType::GRAYA(Grayscale::G4) => todo!(),
-        ColorType::GRAYA(Grayscale::G2) => todo!(),
-        ColorType::GRAYA(Grayscale::G1) => todo!(),
-        ColorType::GRAY(Grayscale::G4) => todo!(),
-        ColorType::GRAY(Grayscale::G2) => todo!(),
-        ColorType::GRAY(Grayscale::G1) => todo!(),
+        ColorType::GRAYA(Grayscale::G4) => {
+            let mut res: Vec<RGBA16> = Vec::new();
+            (0 .. row.len()).step_by(2).for_each(|ndx| {
+                res.push((
+                      ((row[ndx    ].0 & 15) << 4)
+                    | ( row[ndx + 1].0 & 15      ),
+                    0,
+                    0,
+                    0
+                ));
+            });
+            res
+        },
+        ColorType::GRAY(Grayscale::G4) => {
+            assert!((row.len() & 1) == 0);
+            let mut res: Vec<RGBA16> = Vec::new();
+            (0 .. row.len()).for_each(|ndx| {
+                res.push((
+                      ((row[ndx    ].0 & 15) << 4)
+                    | ( row[ndx    ].3 & 15      ),
+                    0,
+                    0,
+                    0
+                ));
+            });
+            res
+        },
+        ColorType::GRAYA(Grayscale::G2) => {
+            assert!((row.len() & 1) == 0);
+            let mut res: Vec<RGBA16> = Vec::new();
+            (0 .. row.len()).step_by(2).for_each(|ndx| {
+                res.push((
+                      ((row[ndx    ].0 & 3) << 6)
+                    | ((row[ndx    ].1 & 3) << 4)
+                    | ((row[ndx + 1].0 & 3) << 2)
+                    | ( row[ndx + 1].1 & 3      ),
+                    0,
+                    0,
+                    0
+                ));
+            });
+            res
+        },
+        ColorType::GRAY(Grayscale::G2) => {
+            assert!((row.len() & 3) == 0);
+            let mut res: Vec<RGBA16> = Vec::new();
+            (0 .. row.len()).step_by(4).for_each(|ndx| {
+                res.push((
+                      ((row[ndx    ].0 & 3) << 6)
+                    | ((row[ndx + 1].0 & 3) << 4)
+                    | ((row[ndx + 2].0 & 3) << 2)
+                    | ( row[ndx + 3].0 & 3      ),
+                    0,
+                    0,
+                    0
+                ));
+            });
+            res
+        },
+        ColorType::GRAYA(Grayscale::G1) => {
+            assert!((row.len() & 3) == 0);
+            let mut res: Vec<RGBA16> = Vec::new();
+            (0 .. row.len()).step_by(4).for_each(|ndx| {
+                res.push((
+                      ((row[ndx    ].0 & 1) << 7)
+                    | ((row[ndx    ].1 & 1) << 6)
+                    | ((row[ndx + 1].0 & 1) << 5)
+                    | ((row[ndx + 1].1 & 1) << 4)
+                    | ((row[ndx + 2].0 & 1) << 3)
+                    | ((row[ndx + 2].1 & 1) << 2)
+                    | ((row[ndx + 3].0 & 1) << 1)
+                    | ( row[ndx + 3].1 & 1      ),
+                    0,
+                    0,
+                    0
+                ));
+            });
+            res
+        },
+        ColorType::GRAY(Grayscale::G1) => {
+            assert!((row.len() & 7) == 0);
+            let mut res: Vec<RGBA16> = Vec::new();
+            (0 .. row.len()).step_by(8).for_each(|ndx| {
+                res.push((
+                      ((row[ndx    ].0 & 1) << 7)
+                    | ((row[ndx + 1].0 & 1) << 6)
+                    | ((row[ndx + 2].0 & 1) << 5)
+                    | ((row[ndx + 3].0 & 1) << 4)
+                    | ((row[ndx + 4].0 & 1) << 3)
+                    | ((row[ndx + 5].0 & 1) << 2)
+                    | ((row[ndx + 6].0 & 1) << 1)
+                    | ( row[ndx + 7].0 & 1      ),
+                    0,
+                    0,
+                    0
+                ));
+            });
+            res
+        }
         a => panic!("bad pack_pix argument: {a:?}"),
     }
 }
@@ -1166,6 +1259,23 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
                     }
                 },
                 ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => {
+                    while (line.len() & 1) != 0 {
+                        line.push((0, 0, 0, 0))
+                    }
+                },
+                ColorType::GRAY(Grayscale::G1) => {
+                    while (line.len() & 7) != 0 {
+                        line.push((0, 0, 0, 0))
+                    }
+                },
+                ColorType::GRAY(Grayscale::G2) |
+                ColorType::GRAYA(Grayscale::G1) => {
+                    while (line.len() & 3) != 0 {
+                        line.push((0, 0, 0, 0))
+                    }
+                },
+                ColorType::GRAY(Grayscale::G4) |
+                ColorType::GRAYA(Grayscale::G2) => {
                     while (line.len() & 1) != 0 {
                         line.push((0, 0, 0, 0))
                     }
