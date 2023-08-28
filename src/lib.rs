@@ -1476,7 +1476,7 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
     };
 
     let mut above: Vec<RGBA16> = vec![(0, 0, 0, 0); width];
-    let mut ndx_above: Vec<u8> = vec![0; width];
+    let mut ndx_above: Vec<u8> = vec![0; width * 4];// XXX for GRAY(A)
     let mut ndx_line: Vec<u8> = Vec::new();
     let mut ndx_line_raw: Vec<u8> = Vec::new();
     //let mut gray_line: Vec<u16> = Vec::new();
@@ -1839,22 +1839,23 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                 ndx_line = Vec::new();
                 let mut graya_line = Vec::new();
 
-                (0 .. width).step_by(2).for_each(|ox| {
-                    let x = ox >> 1;
+                (0 .. width * 2).step_by(2).for_each(|ox| {
+                    let x = ox;
 
                     let value = add(slice[ox + 1], png_rev(
-                        if x < 1 { 0 } else { (ndx_line[x - 1] ) as u8},
+                        if x < 2 { 0 } else { (ndx_line[x - 2] ) as u8},
                         (ndx_above[x] ) as u8,
-                        if x < 1 { 0 } else { (ndx_above[x - 1] ) as u8 },
+                        if x < 2 { 0 } else { (ndx_above[x - 2] ) as u8 },
                         est
                     ));
 
                     let avalue = add(slice[ox + 2], png_rev(
-                        if x < 1 { 0 } else { (ndx_line[x - 1] ) as u8},
-                        (ndx_above[x] ) as u8,
-                        if x < 1 { 0 } else { (ndx_above[x - 1] ) as u8 },
+                        if x < 2 { 0 } else { (ndx_line[x - 1] ) as u8},
+                        (ndx_above[x + 1] ) as u8,
+                        if x < 2 { 0 } else { (ndx_above[x - 1] ) as u8 },
                         est
                     ));
+
 
                     ndx_line.push(value);
                     ndx_line.push(avalue);
@@ -1977,13 +1978,20 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
             match color {
                 6 => if depth == 8 { color_type = ColorType::RGBA } else { color_type = ColorType::RGBA16 },
                 2 => if depth == 8 { color_type = ColorType::RGB } else { color_type = ColorType::RGB16 },
-                3 =>
-                    match depth {
+                3 => match depth {
                         1 => color_type = ColorType::NDX(Palette::P1),
                         2 => color_type = ColorType::NDX(Palette::P2),
                         4 => color_type = ColorType::NDX(Palette::P4),
                         8 => color_type = ColorType::NDX(Palette::P8),
                         _ => panic!("color depth detection error"),
+                    },
+                0 => match depth {
+                        8 => color_type = ColorType::GRAY(Grayscale::G8),
+                        d => return Err(format!("depth {d} for GRAY not supported"))
+                    },
+                4 => match depth {
+                        8 => color_type = ColorType::GRAYA(Grayscale::G8),
+                        d => return Err(format!("depth {d} for GRAYA not supported"))
                     },
                 c => return Err(format!("color type {c} not supported"))
             }
@@ -2444,6 +2452,85 @@ mod tests {
         )
     }
 
+    fn image_gs(depth: usize) -> (Vec<Vec<RGBA16>>, // restored image
+                                  Vec<Vec<u16>>) { // data
+        assert!(depth == 1 || depth == 2 || depth == 4 || depth == 8 || depth == 16);
+
+        let s = 1 << depth;
+
+        let w = WIDTH;
+        let h = HEIGHT;
+
+        let mut orig_img: Vec<Vec<RGBA16>> = Vec::new();
+        let mut data_img: Vec<Vec<u16>> = Vec::new();
+
+        (0 .. h).for_each(|y| {
+            let mut orig_line: Vec<RGBA16> = Vec::new();
+            let mut data_line: Vec<u16> = Vec::new();
+
+            (0 .. w).for_each(|x| {
+                let ndx = (x + y) % s;
+                let org = (ndx as u32 * 0xffff_u32 / (s - 1) as u32) as u16;
+
+                data_line.push(ndx as u16);
+                orig_line.push((
+                    org,
+                    org,
+                    org,
+                    0xffff_u16
+                ));
+            });
+            orig_img.push(orig_line);
+            data_img.push(data_line);
+        });
+
+        (
+            orig_img,
+            data_img
+        )
+    }
+
+    fn image_gsa(depth: usize) -> (Vec<Vec<RGBA16>>, // restored image
+                                   Vec<Vec<(u16, u16)>>) { // data
+        assert!(depth == 1 || depth == 2 || depth == 4 || depth == 8 || depth == 16);
+
+        let s = 1 << depth;
+
+        let w = WIDTH;
+        let h = HEIGHT;
+
+        let mut orig_img: Vec<Vec<RGBA16>> = Vec::new();
+        let mut data_img: Vec<Vec<(u16, u16)>> = Vec::new();
+
+        (0 .. h).for_each(|y| {
+            let mut orig_line: Vec<RGBA16> = Vec::new();
+            let mut data_line: Vec<(u16, u16)> = Vec::new();
+
+            (0 .. w).for_each(|x| {
+                let ndx = (x + y) % s;
+                let org = (ndx as u32 * 0xffff_u32 / (s - 1) as u32) as u16;
+
+                let andx = (x as i32 - y as i32) as usize % s;
+                let aorg = (andx as u32 * 0xffff_u32 / (s - 1) as u32) as u16;
+
+                data_line.push((ndx as u16, andx as u16));
+                orig_line.push((
+                    org,
+                    org,
+                    org,
+                    aorg
+                ));
+            });
+            orig_img.push(orig_line);
+            data_img.push(data_line);
+        });
+
+        (
+            orig_img,
+            data_img
+        )
+    }
+
     #[test]
     pub fn test_rgba_all() {
         let (orig, image) = image_rgba();
@@ -2857,6 +2944,75 @@ mod tests {
             assert_eq!(back.color_type, ColorType::NDXA(Palette::P8));
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P8));
+        });
+    }
+
+    #[test]
+    pub fn test_gs_8() {
+        let (orig, data) = image_gs(8);
+
+        let types = vec![
+            Filter::None,
+            Filter::Sub,
+            Filter::Up,
+            Filter::Avg,
+            Filter::Paeth
+        ];
+
+        types.iter().for_each(|est| {
+            println!("{est:?}");
+
+            let fname = format!("tmp/gs_{est:?}_8.png");
+
+            write_apng(&fname,
+                ImageData::GRAY(vec![data.clone()], Grayscale::G8),
+                Some(*est),
+                None,
+                false
+            ).unwrap();
+
+            let back = read_png(&fname).unwrap();
+
+            assert_eq!(back.width, WIDTH);
+            assert_eq!(back.height, HEIGHT);
+            assert_eq!(back.color_type, ColorType::GRAY(Grayscale::G8));
+            assert_eq!(back.data, orig);
+            assert_eq!(back.raw, ImageData::GRAY(vec![data.clone()], Grayscale::G8));
+        });
+    }
+
+
+    #[test]
+    pub fn test_gsa_8() {
+        let (orig, data) = image_gsa(8);
+
+        let types = vec![
+            Filter::None,
+            Filter::Sub,
+            Filter::Up,
+            Filter::Avg,
+            Filter::Paeth
+        ];
+
+        types.iter().for_each(|est| {
+            println!("{est:?}");
+
+            let fname = format!("tmp/gsa_{est:?}_8.png");
+
+            write_apng(&fname,
+                ImageData::GRAYA(vec![data.clone()], Grayscale::G8),
+                Some(*est),
+                None,
+                false
+            ).unwrap();
+
+            let back = read_png(&fname).unwrap();
+
+            assert_eq!(back.width, WIDTH);
+            assert_eq!(back.height, HEIGHT);
+            assert_eq!(back.color_type, ColorType::GRAYA(Grayscale::G8));
+            assert_eq!(back.data, orig);
+            assert_eq!(back.raw, ImageData::GRAYA(vec![data.clone()], Grayscale::G8));
         });
     }
 
