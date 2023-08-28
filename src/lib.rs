@@ -391,19 +391,19 @@ fn pack_pix(color_type: ColorType, row: &[RGBA16]) -> Vec<RGBA16> {
             });
             res
         },
-        ColorType::GRAYA(Grayscale::G4) => {
-            let mut res: Vec<RGBA16> = Vec::new();
-            (0 .. row.len()).for_each(|ndx| {
-                res.push((
-                      ((row[ndx    ].0 & 15) << 4)
-                    | ( row[ndx    ].3 & 15      ),
-                    0,
-                    0,
-                    0
-                ));
-            });
-            res
-        },
+        //ColorType::GRAYA(Grayscale::G4) => {
+            //let mut res: Vec<RGBA16> = Vec::new();
+            //(0 .. row.len()).for_each(|ndx| {
+                //res.push((
+                      //((row[ndx    ].0 & 15) << 4)
+                    //| ( row[ndx    ].3 & 15      ),
+                    //0,
+                    //0,
+                    //0
+                //));
+            //});
+            //res
+        //},
         ColorType::GRAY(Grayscale::G4) => {
             assert!((row.len() & 1) == 0);
             let mut res: Vec<RGBA16> = Vec::new();
@@ -418,22 +418,22 @@ fn pack_pix(color_type: ColorType, row: &[RGBA16]) -> Vec<RGBA16> {
             });
             res
         },
-        ColorType::GRAYA(Grayscale::G2) => {
-            assert!((row.len() & 1) == 0);
-            let mut res: Vec<RGBA16> = Vec::new();
-            (0 .. row.len()).step_by(2).for_each(|ndx| {
-                res.push((
-                      ((row[ndx    ].0 & 3) << 6)
-                    | ((row[ndx    ].1 & 3) << 4)
-                    | ((row[ndx + 1].0 & 3) << 2)
-                    | ( row[ndx + 1].1 & 3      ),
-                    0,
-                    0,
-                    0
-                ));
-            });
-            res
-        },
+        //ColorType::GRAYA(Grayscale::G2) => {
+            //assert!((row.len() & 1) == 0);
+            //let mut res: Vec<RGBA16> = Vec::new();
+            //(0 .. row.len()).step_by(2).for_each(|ndx| {
+                //res.push((
+                      //((row[ndx    ].0 & 3) << 6)
+                    //| ((row[ndx    ].1 & 3) << 4)
+                    //| ((row[ndx + 1].0 & 3) << 2)
+                    //| ( row[ndx + 1].1 & 3      ),
+                    //0,
+                    //0,
+                    //0
+                //));
+            //});
+            //res
+        //},
         ColorType::GRAY(Grayscale::G2) => {
             assert!((row.len() & 3) == 0);
             let mut res: Vec<RGBA16> = Vec::new();
@@ -450,26 +450,26 @@ fn pack_pix(color_type: ColorType, row: &[RGBA16]) -> Vec<RGBA16> {
             });
             res
         },
-        ColorType::GRAYA(Grayscale::G1) => {
-            assert!((row.len() & 3) == 0);
-            let mut res: Vec<RGBA16> = Vec::new();
-            (0 .. row.len()).step_by(4).for_each(|ndx| {
-                res.push((
-                      ((row[ndx    ].0 & 1) << 7)
-                    | ((row[ndx    ].1 & 1) << 6)
-                    | ((row[ndx + 1].0 & 1) << 5)
-                    | ((row[ndx + 1].1 & 1) << 4)
-                    | ((row[ndx + 2].0 & 1) << 3)
-                    | ((row[ndx + 2].1 & 1) << 2)
-                    | ((row[ndx + 3].0 & 1) << 1)
-                    | ( row[ndx + 3].1 & 1      ),
-                    0,
-                    0,
-                    0
-                ));
-            });
-            res
-        },
+        //ColorType::GRAYA(Grayscale::G1) => {
+            //assert!((row.len() & 3) == 0);
+            //let mut res: Vec<RGBA16> = Vec::new();
+            //(0 .. row.len()).step_by(4).for_each(|ndx| {
+                //res.push((
+                      //((row[ndx    ].0 & 1) << 7)
+                    //| ((row[ndx    ].1 & 1) << 6)
+                    //| ((row[ndx + 1].0 & 1) << 5)
+                    //| ((row[ndx + 1].1 & 1) << 4)
+                    //| ((row[ndx + 2].0 & 1) << 3)
+                    //| ((row[ndx + 2].1 & 1) << 2)
+                    //| ((row[ndx + 3].0 & 1) << 1)
+                    //| ( row[ndx + 3].1 & 1      ),
+                    //0,
+                    //0,
+                    //0
+                //));
+            //});
+            //res
+        //},
         ColorType::GRAY(Grayscale::G1) => {
             assert!((row.len() & 7) == 0);
             let mut res: Vec<RGBA16> = Vec::new();
@@ -500,11 +500,11 @@ fn png_none(row_raw: &[RGBA16], _above: &[RGBA16], color_type: ColorType) -> Vec
     res.push(0_u8);
 
     let row = match color_type {
-        ColorType::GRAYA(Grayscale::G4) |
+        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        ColorType::GRAYA(Grayscale::G2) |
+        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        ColorType::GRAYA(Grayscale::G1) |
+        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, row_raw),
@@ -578,11 +578,11 @@ fn png_sub(row_raw: &[RGBA16], _above: &[RGBA16], color_type: ColorType) -> Vec<
     res.push(1_u8);
 
     let row = match color_type {
-        ColorType::GRAYA(Grayscale::G4) |
+        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        ColorType::GRAYA(Grayscale::G2) |
+        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        ColorType::GRAYA(Grayscale::G1) |
+        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, row_raw),
@@ -659,11 +659,11 @@ fn png_up(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> Ve
     res.push(2_u8);
 
     let row = match color_type {
-        ColorType::GRAYA(Grayscale::G4) |
+        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        ColorType::GRAYA(Grayscale::G2) |
+        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        ColorType::GRAYA(Grayscale::G1) |
+        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, row_raw),
@@ -671,11 +671,11 @@ fn png_up(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> Ve
     };
 
     let above = match color_type {
-        ColorType::GRAYA(Grayscale::G4) |
+        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        ColorType::GRAYA(Grayscale::G2) |
+        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        ColorType::GRAYA(Grayscale::G1) |
+        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, above_raw),
@@ -762,11 +762,11 @@ fn png_avg(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> V
 
 
     let row = match color_type {
-        ColorType::GRAYA(Grayscale::G4) |
+        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        ColorType::GRAYA(Grayscale::G2) |
+        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        ColorType::GRAYA(Grayscale::G1) |
+        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, row_raw),
@@ -774,11 +774,11 @@ fn png_avg(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> V
     };
 
     let above = match color_type {
-        ColorType::GRAYA(Grayscale::G4) |
+        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        ColorType::GRAYA(Grayscale::G2) |
+        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        ColorType::GRAYA(Grayscale::G1) |
+        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, above_raw),
@@ -867,11 +867,11 @@ fn png_paeth(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) ->
     res.push(4_u8);
 
     let row = match color_type {
-        ColorType::GRAYA(Grayscale::G4) |
+        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        ColorType::GRAYA(Grayscale::G2) |
+        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        ColorType::GRAYA(Grayscale::G1) |
+        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, row_raw),
@@ -879,11 +879,11 @@ fn png_paeth(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) ->
     };
 
     let above = match color_type {
-        ColorType::GRAYA(Grayscale::G4) |
+        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        ColorType::GRAYA(Grayscale::G2) |
+        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        ColorType::GRAYA(Grayscale::G1) |
+        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, above_raw),
@@ -1311,14 +1311,14 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
                         line.push((0, 0, 0, 0))
                     }
                 },
-                ColorType::GRAY(Grayscale::G2) |
-                ColorType::GRAYA(Grayscale::G1) => {
+                ColorType::GRAY(Grayscale::G2) => {
+                //ColorType::GRAYA(Grayscale::G1) => {
                     while (line.len() & 3) != 0 {
                         line.push((0, 0, 0, 0))
                     }
                 },
-                ColorType::GRAY(Grayscale::G4) |
-                ColorType::GRAYA(Grayscale::G2) => {
+                ColorType::GRAY(Grayscale::G4) => {
+                //ColorType::GRAYA(Grayscale::G2) => {
                     while (line.len() & 1) != 0 {
                         line.push((0, 0, 0, 0))
                     }
@@ -1466,11 +1466,14 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
         ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => b'\x04',
         ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => b'\x02',
         ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => b'\x01',
-        ColorType::GRAYA(Grayscale::G1) | ColorType::GRAY(Grayscale::G1) => b'\x01',
-        ColorType::GRAYA(Grayscale::G2) | ColorType::GRAY(Grayscale::G2) => b'\x02',
-        ColorType::GRAYA(Grayscale::G4) | ColorType::GRAY(Grayscale::G4) => b'\x04',
-        ColorType::GRAYA(Grayscale::G8) | ColorType::GRAY(Grayscale::G8) => b'\x08',
-        ColorType::GRAYA(Grayscale::G16) | ColorType::GRAY(Grayscale::G16) => b'\x10',
+        ColorType::GRAY(Grayscale::G1) => b'\x01',
+        ColorType::GRAY(Grayscale::G2) => b'\x02',
+        ColorType::GRAY(Grayscale::G4) => b'\x04',
+        ColorType::GRAY(Grayscale::G8) => b'\x08',
+        ColorType::GRAY(Grayscale::G16) => b'\x10',
+        ColorType::GRAYA(Grayscale::G8) => b'\x08',
+        ColorType::GRAYA(Grayscale::G16) => b'\x10',
+        _ => panic!("how???")
     };
 
     ihdr.append(&mut vec![bpp, color_byte, b'\x00', b'\x00', if adam_7 { b'\x01' } else { b'\x00' }]);
@@ -1730,16 +1733,17 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
         ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) / 8) + 1,
 
         ColorType::GRAY(Grayscale::G1) => (width + 7) / 8 + 1,
-        ColorType::GRAYA(Grayscale::G1) =>  (width + 3) / 4 + 1,
+        //ColorType::GRAYA(Grayscale::G1) =>  (width + 3) / 4 + 1,
         ColorType::GRAY(Grayscale::G2) =>  (width + 3) / 4 + 1,
-        ColorType::GRAYA(Grayscale::G2) =>  (width + 2) / 2 + 1,
+        //ColorType::GRAYA(Grayscale::G2) =>  (width + 2) / 2 + 1,
         ColorType::GRAY(Grayscale::G4) =>  (width + 1) / 2 + 1,
-        ColorType::GRAYA(Grayscale::G4) =>  width + 1,
+        //ColorType::GRAYA(Grayscale::G4) =>  width + 1,
 
         ColorType::GRAY(Grayscale::G8) => width + 1,
         ColorType::GRAYA(Grayscale::G8) => width * 2 + 1,
         ColorType::GRAY(Grayscale::G16) => width * 2 + 1,
         ColorType::GRAYA(Grayscale::G16) => width * 4 + 1,
+        _ => panic!("how???")
     };
 
     let mut above: Vec<RGBA16> = vec![(0, 0, 0, 0); width];
@@ -1760,15 +1764,16 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
             ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => ((width + 3) / 4 + 1) * y,
             ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) / 8 + 1) * y,
             ColorType::GRAY(Grayscale::G1) => ((width + 7) / 8 + 1) * y,
-            ColorType::GRAYA(Grayscale::G1) => ((width + 3) / 4 + 1) * y,
+            //ColorType::GRAYA(Grayscale::G1) => ((width + 3) / 4 + 1) * y,
             ColorType::GRAY(Grayscale::G2) => ((width + 3) / 4 + 1) * y,
-            ColorType::GRAYA(Grayscale::G2) =>  ((width + 1) / 2 + 1) * y,
+            //ColorType::GRAYA(Grayscale::G2) =>  ((width + 1) / 2 + 1) * y,
             ColorType::GRAY(Grayscale::G4) => ((width + 1) / 2 + 1) * y,
-            ColorType::GRAYA(Grayscale::G4) => (width + 1) * y,
+            //ColorType::GRAYA(Grayscale::G4) => (width + 1) * y,
             ColorType::GRAY(Grayscale::G8) => (width + 1) * y,
             ColorType::GRAYA(Grayscale::G8) => (width * 2 + 1) * y,
             ColorType::GRAY(Grayscale::G16) => (width * 2 + 1) * y,
             ColorType::GRAYA(Grayscale::G16) => (width * 4 + 1) * y,
+            _ => panic!("how???")
         };
         let slice = &raw[offs .. offs + slice_len];
         let mode = slice[0];
@@ -2458,9 +2463,9 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                         d => return Err(format!("depth {d} for GRAY not supported"))
                     },
                 4 => match depth {
-                        1 => color_type = ColorType::GRAYA(Grayscale::G1),
-                        2 => color_type = ColorType::GRAYA(Grayscale::G2),
-                        4 => color_type = ColorType::GRAYA(Grayscale::G4),
+                        //1 => color_type = ColorType::GRAYA(Grayscale::G1),
+                        //2 => color_type = ColorType::GRAYA(Grayscale::G2),
+                        //4 => color_type = ColorType::GRAYA(Grayscale::G4),
                         8 => color_type = ColorType::GRAYA(Grayscale::G8),
                         16 => color_type = ColorType::GRAYA(Grayscale::G16),
                         d => return Err(format!("depth {d} for GRAYA not supported"))
@@ -2498,12 +2503,13 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                 ColorType::GRAY(Grayscale::G8) => (width + 1) * height,
                 ColorType::GRAYA(Grayscale::G16) => (width * 4 + 1) * height,
                 ColorType::GRAY(Grayscale::G16) => (width * 2 + 1) * height,
-                ColorType::GRAYA(Grayscale::G4) => (width + 1) * height,
+                //ColorType::GRAYA(Grayscale::G4) => (width + 1) * height,
                 ColorType::GRAY(Grayscale::G4) => ((width + 1) / 2 + 1) * height,
-                ColorType::GRAYA(Grayscale::G2) => ((width + 1) / 2 + 1) * height,
+                //ColorType::GRAYA(Grayscale::G2) => ((width + 1) / 2 + 1) * height,
                 ColorType::GRAY(Grayscale::G2) => ((width + 3) / 4 + 1) * height,
-                ColorType::GRAYA(Grayscale::G1) => ((width + 3) / 4 + 1) * height,
+                //ColorType::GRAYA(Grayscale::G1) => ((width + 3) / 4 + 1) * height,
                 ColorType::GRAY(Grayscale::G1) => ((width + 7) / 8 + 1) * height,
+                _ => panic!("how???")
             };
 
             if let Err(e) = deco.read_to_end(&mut unpacked) {
