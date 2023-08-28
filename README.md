@@ -90,14 +90,15 @@ supported formats
 | ImageData::NDX    | n-bit indexed palette without alpha |
 | ImageData::NDXA   | n-bit indexed palette with alpha    |
 | ImageData::GRAY   | k-bit grayscale without alpha       |
-| ImageData::GRAYA  | k-bit grayscale with alpha          |
+| ImageData::GRAYA  | i-bit grayscale with alpha          |
 
-where n is 1, 2, 4 or 8 and k is 8
+n: 1, 2, 4, 8
+k: 1, 2, 4, 8, 16
+i: 8, 16
 
 todo
 ====
 
-- grayscale I/O for 1, 2, 4, 16 bpp,
 - Adam-7 input,
 - APNG input,
 
