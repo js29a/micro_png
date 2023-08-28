@@ -7,7 +7,7 @@ repository = "https://github.com/js29a/micro_png"
 version = "0.3.0"
 edition = "2021"
 readme = "README.md"
-description = "Low-level minimalist TrueColor (8/16) and 8-bit palette APNG writer and PNG reader with just a few dependencies."
+description = "Low-level minimalist APNG writer and PNG reader with just a few dependencies (8,16-RGB(A), 1,2,4,8-palette, 8,16-Grayscale)."
 categories = ["multimedia::images"]
 keywords = ["png", "apng"]
 
