@@ -1,3 +1,6 @@
+## 0.3.2 (2023-08-28T18:14:54)
+  - 1, 2, 4 - grayscale no alpha OK
+
 ## 0.3.1 (2023-08-28T15:21:53)
   - 8/16 bit grayscale with and without alpha
 
