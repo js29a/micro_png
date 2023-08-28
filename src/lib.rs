@@ -33,13 +33,20 @@ pub type NDX = u8;
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
 pub enum Palette {
 /// One-bit palette - 2 colors.
-    B1,
+    P1,
 /// Two-bit palette - 4 colors.
-    B2,
+    P2,
 /// Four-bit palette - 16 colors.
-    B4,
+    P4,
 /// Eight-bit palette - 256 colors.
-    B8
+    P8
+}
+
+/// Grayscale bits count.
+#[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
+pub enum Grayscale {
+/// Eigth-bit - 256 levels.
+    G8
 }
 
 const ADAM_7: [usize; 64] = [
@@ -84,7 +91,11 @@ pub enum ColorType {
 /// RGB 16 bits - [ImageData::RGB16].
     RGB16,
 /// RGB + Alpha 16 bits - [ImageData::RGBA16].
-    RGBA16
+    RGBA16,
+/// Grayscale without Alpha - [ImageData::GRAY].
+    GRAY(Grayscale),
+/// Grayscale with Alpha - [ImageData:GRAYA].
+    GRAYA(Grayscale)
 }
 
 /// Image data. Input for [write_apng]. For loaded image can be accessed using [Image::raw].
@@ -100,14 +111,18 @@ pub enum ImageData {
     RGB(Vec<Vec<Vec<RGB>>>),
 /// 32 bit color mode.
     RGBA(Vec<Vec<Vec<RGBA>>>),
-/// 256-color palette without Alpha.
+/// 2,4,16,256-color palette without Alpha.
     NDX(Vec<Vec<Vec<NDX>>>, Vec<RGB>, Palette),
-/// 256-color palette with Alpha for each palette entry.
+/// 2,4,16,256-color palette with Alpha for each palette entry.
     NDXA(Vec<Vec<Vec<NDX>>>, Vec<RGBA>, Palette),
 /// 48 bit color mode.
     RGB16(Vec<Vec<Vec<RGB16>>>),
 /// 64 bit color mode.
     RGBA16(Vec<Vec<Vec<RGBA16>>>),
+/// Grayscale without Alpha.
+    GRAY(Vec<Vec<Vec<u16>>>, Grayscale),
+/// Grayscale with Alpha.
+    GRAYA(Vec<Vec<Vec<(u16, u16)>>>, Grayscale),
 }
 
 /// Image structure.
@@ -316,9 +331,9 @@ fn paeth(a: u8, b: u8, c: u8) -> u8 {
 
 fn pack_pix(color_type: ColorType, row: &[RGBA16]) -> Vec<RGBA16> {
     match color_type {
-        ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) =>
+        ColorType::NDXA(Palette::P8) | ColorType::NDX(Palette::P8) =>
             row.to_vec(),
-        ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) => {
+        ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => {
             assert!((row.len() & 1) == 0);
             let mut res: Vec<RGBA16> = Vec::new();
             (0 .. row.len()).step_by(2).for_each(|ndx| {
@@ -332,7 +347,7 @@ fn pack_pix(color_type: ColorType, row: &[RGBA16]) -> Vec<RGBA16> {
             });
             res
         },
-        ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) => {
+        ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => {
             assert!((row.len() & 3) == 0);
             let mut res: Vec<RGBA16> = Vec::new();
             (0 .. row.len()).step_by(4).for_each(|ndx| {
@@ -348,7 +363,7 @@ fn pack_pix(color_type: ColorType, row: &[RGBA16]) -> Vec<RGBA16> {
             });
             res
         },
-        ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => {
+        ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => {
             assert!((row.len() & 7) == 0);
             let mut res: Vec<RGBA16> = Vec::new();
             (0 .. row.len()).step_by(8).for_each(|ndx| {
@@ -415,6 +430,13 @@ fn png_none(row_raw: &[RGBA16], _above: &[RGBA16], color_type: ColorType) -> Vec
                 (pix.2 >> 8) as u8
             ],
             ColorType::NDXA(_) | ColorType::NDX(_) => vec![pix.0 as u8],
+            ColorType::GRAY(Grayscale::G8) => vec![
+                pix.0 as u8
+            ],
+            ColorType::GRAYA(Grayscale::G8) => vec![
+                pix.0 as u8,
+                pix.3 as u8
+            ],
         }
     }).collect::<Vec<Vec<u8>>>().iter().flatten());
 
@@ -468,6 +490,13 @@ fn png_sub(row_raw: &[RGBA16], _above: &[RGBA16], color_type: ColorType) -> Vec<
             ],
             ColorType::NDXA(_) | ColorType::NDX(_) => vec![
                 sub((pix.0 & 0xff) as u8, (prev.0 & 0xff) as u8),
+            ],
+            ColorType::GRAY(Grayscale::G8) => vec![
+                sub(pix.0 as u8, prev.0 as u8),
+            ],
+            ColorType::GRAYA(Grayscale::G8) => vec![
+                sub(pix.0 as u8, prev.0 as u8),
+                sub(pix.3 as u8, prev.3 as u8),
             ],
         };
         prev = *pix;
@@ -532,6 +561,15 @@ fn png_up(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> Ve
             ColorType::NDXA(_) | ColorType::NDX(_) =>
                 vec![
                     sub(pix.0 as u8, above[x].0 as u8)
+                ],
+            ColorType::GRAYA(Grayscale::G8) =>
+                vec![
+                    sub(pix.0 as u8, above[x].0 as u8),
+                    sub(pix.3 as u8, above[x].3 as u8),
+                ],
+            ColorType::GRAY(Grayscale::G8) =>
+                vec![
+                    sub(pix.0 as u8, above[x].0 as u8),
                 ],
         }
     }).collect::<Vec<Vec<u8>>>().iter().flatten());
@@ -602,6 +640,13 @@ fn png_avg(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> V
             ],
             ColorType::NDXA(_) | ColorType::NDX(_) => vec![
                 sub(pix.0 as u8, a0l),
+            ],
+            ColorType::GRAY(Grayscale::G8) => vec![
+                sub(pix.0 as u8, a0l),
+            ],
+            ColorType::GRAYA(Grayscale::G8) => vec![
+                sub(pix.0 as u8, a0l),
+                sub(pix.3 as u8, a3l),
             ],
         };
 
@@ -709,6 +754,13 @@ fn png_paeth(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) ->
             ColorType::NDXA(_) | ColorType::NDX(_) => vec![
                 sub((pix.0 & 0xff) as u8, paeth(a0l, b0l, c0l)),
             ],
+            ColorType::GRAY(Grayscale::G8) => vec![
+                sub(pix.0 as u8, paeth(a0l, b0l, c0l)),
+            ],
+            ColorType::GRAYA(Grayscale::G8) => vec![
+                sub(pix.0 as u8, paeth(a0l, b0l, c0l)),
+                sub(pix.3 as u8, paeth(a3l, b3l, c3l)),
+            ]
         };
 
         prev = *pix;
@@ -831,6 +883,32 @@ fn prepare_frames(image_data: &ImageData) -> Vec<Vec<Vec<RGBA16>>> {
                     }).collect()
                 }).collect()
             }).collect(),
+        ImageData::GRAYA(gray, _) =>
+            gray.iter().map(|frame| -> Vec<Vec<RGBA16>> {
+                frame.iter().map(|line| -> Vec<RGBA16> {
+                    line.iter().map(|pix| -> RGBA16 {
+                        (
+                            (*pix).0,
+                            0,
+                            0,
+                            (*pix).1
+                        )
+                    }).collect()
+                }).collect()
+            }).collect(),
+        ImageData::GRAY(gray, _) =>
+            gray.iter().map(|frame| -> Vec<Vec<RGBA16>> {
+                frame.iter().map(|line| -> Vec<RGBA16> {
+                    line.iter().map(|pix| -> RGBA16 {
+                        (
+                            *pix as u16,
+                            0,
+                            0,
+                            0
+                        )
+                    }).collect()
+                }).collect()
+            }).collect(),
     }
 }
 
@@ -838,10 +916,10 @@ fn gen_palette(image_data: &ImageData) -> Vec<u8> {
     let mut res: Vec<u8> = Vec::new();
 
     let pal_len = match image_data {
-        ImageData::NDXA(_, _, Palette::B8) | ImageData::NDX(_, _, Palette::B8) => 256,
-        ImageData::NDXA(_, _, Palette::B4) | ImageData::NDX(_, _, Palette::B4) => 16,
-        ImageData::NDXA(_, _, Palette::B2) | ImageData::NDX(_, _, Palette::B2) => 4,
-        ImageData::NDXA(_, _, Palette::B1) | ImageData::NDX(_, _, Palette::B1) => 2,
+        ImageData::NDXA(_, _, Palette::P8) | ImageData::NDX(_, _, Palette::P8) => 256,
+        ImageData::NDXA(_, _, Palette::P4) | ImageData::NDX(_, _, Palette::P4) => 16,
+        ImageData::NDXA(_, _, Palette::P2) | ImageData::NDX(_, _, Palette::P2) => 4,
+        ImageData::NDXA(_, _, Palette::P1) | ImageData::NDX(_, _, Palette::P1) => 2,
         _ => 0
     };
 
@@ -987,17 +1065,17 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
             }
 
             match color_type {
-                ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => {
+                ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => {
                     while (line.len() & 7) != 0 {
                         line.push((0, 0, 0, 0))
                     }
                 },
-                ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) => {
+                ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => {
                     while (line.len() & 3) != 0 {
                         line.push((0, 0, 0, 0))
                     }
                 },
-                ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) => {
+                ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => {
                     while (line.len() & 1) != 0 {
                         line.push((0, 0, 0, 0))
                     }
@@ -1098,7 +1176,9 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
         ImageData::RGBA(_) => ColorType::RGBA,
         ImageData::RGB(_) => ColorType::RGB,
         ImageData::NDXA(_, _, p) => ColorType::NDXA(*p),
-        ImageData::NDX(_, _, p) => ColorType::NDX(*p)
+        ImageData::NDX(_, _, p) => ColorType::NDX(*p),
+        ImageData::GRAYA(_, g) => ColorType::GRAYA(*g),
+        ImageData::GRAY(_, g) => ColorType::GRAY(*g),
     };
 
     let frames = prepare_frames(image_data);
@@ -1122,6 +1202,8 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
         ColorType::RGB => b'\x02',
         ColorType::NDX(_) => b'\x03',
         ColorType::NDXA(_) => b'\x03',
+        ColorType::GRAY(_) => b'\x00',
+        ColorType::GRAYA(_) => b'\x04',
     };
 
     let bpp = match color_type {
@@ -1129,10 +1211,11 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
         ColorType::RGB16 => b'\x10',
         ColorType::RGBA => b'\x08',
         ColorType::RGB => b'\x08',
-        ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => b'\x08',
-        ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) => b'\x04',
-        ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) => b'\x02',
-        ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => b'\x01',
+        ColorType::NDXA(Palette::P8) | ColorType::NDX(Palette::P8) => b'\x08',
+        ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => b'\x04',
+        ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => b'\x02',
+        ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => b'\x01',
+        ColorType::GRAYA(Grayscale::G8) | ColorType::GRAY(Grayscale::G8) => b'\x08',
     };
 
     ihdr.append(&mut vec![bpp, color_byte, b'\x00', b'\x00', if adam_7 { b'\x01' } else { b'\x00' }]);
@@ -1376,22 +1459,28 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
     let mut raw_rgba: Vec<Vec<RGBA>> = Vec::new();
     let mut raw_rgb: Vec<Vec<RGB>> = Vec::new();
     let mut raw_ndx: Vec<Vec<u8>> = Vec::new();
+    let mut raw_gray: Vec<Vec<u16>> = Vec::new();
+    let mut raw_graya: Vec<Vec<(u16, u16)>> = Vec::new();
 
     let slice_len = match color_type {
         ColorType::RGBA16 => width * 4 * 2 + 1,
         ColorType::RGB16 => width * 3 * 2 + 1,
         ColorType::RGBA => width * 4 + 1,
         ColorType::RGB => width * 3 + 1,
-        ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => width + 1,
-        ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) => ((width + 1) / 2) + 1,
-        ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) => ((width + 3) / 4) + 1,
-        ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => ((width + 7) / 8) + 1,
+        ColorType::NDXA(Palette::P8) | ColorType::NDX(Palette::P8) => width + 1,
+        ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => ((width + 1) / 2) + 1,
+        ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => ((width + 3) / 4) + 1,
+        ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) / 8) + 1,
+        ColorType::GRAY(Grayscale::G8) => width + 1,
+        ColorType::GRAYA(Grayscale::G8) => width * 2 + 1,
     };
 
     let mut above: Vec<RGBA16> = vec![(0, 0, 0, 0); width];
     let mut ndx_above: Vec<u8> = vec![0; width];
     let mut ndx_line: Vec<u8> = Vec::new();
     let mut ndx_line_raw: Vec<u8> = Vec::new();
+    //let mut gray_line: Vec<u16> = Vec::new();
+    //let mut graya_line: Vec<(u16, u16)> = Vec::new();
 
     let status = (0 .. height).map(|y| -> Result<(), String> {
         let offs = match color_type {
@@ -1399,10 +1488,12 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
             ColorType::RGB16 => (width * 3 * 2 + 1) * y,
             ColorType::RGBA => (width * 4 + 1) * y,
             ColorType::RGB => (width * 3 + 1) * y,
-            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => (width + 1) * y,
-            ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) => ((width + 1) / 2 + 1) * y,
-            ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) => ((width + 3) / 4 + 1) * y,
-            ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => ((width + 7) / 8 + 1) * y,
+            ColorType::NDXA(Palette::P8) | ColorType::NDX(Palette::P8) => (width + 1) * y,
+            ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => ((width + 1) / 2 + 1) * y,
+            ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => ((width + 3) / 4 + 1) * y,
+            ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) / 8 + 1) * y,
+            ColorType::GRAY(Grayscale::G8) => (width + 1) * y,
+            ColorType::GRAYA(Grayscale::G8) => (width * 2 + 1) * y,
         };
         let slice = &raw[offs .. offs + slice_len];
         let mode = slice[0];
@@ -1625,15 +1716,15 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                 });
                 raw_rgb.push(rgb_line);
             },
-            ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) |
-            ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) |
-            ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) |
-            ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => {
+            ColorType::NDXA(Palette::P8) | ColorType::NDX(Palette::P8) |
+            ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) |
+            ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) |
+            ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => {
                 let line_width = match color_type {
-                    ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => width,
-                    ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) => (width + 1) / 2,
-                    ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) => (width + 3) / 4,
-                    ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => (width + 7) / 8,
+                    ColorType::NDXA(Palette::P8) | ColorType::NDX(Palette::P8) => width,
+                    ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => (width + 1) / 2,
+                    ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => (width + 3) / 4,
+                    ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => (width + 7) / 8,
                     _ => panic!("internal unpack_idat error"),
                 };
 
@@ -1651,23 +1742,23 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                     );
 
                     let (unpacked, top) = match color_type {
-                        ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) =>
+                        ColorType::NDXA(Palette::P8) | ColorType::NDX(Palette::P8) =>
                             (vec![
                                 ndx
                             ], 1),
-                        ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) =>
+                        ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) =>
                             (vec![
                                 (ndx >> 4) & 0xf,
                                 ndx & 0xf
                             ], 2),
-                        ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) =>
+                        ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) =>
                             (vec![
                                 (ndx >> 6) & 3,
                                 (ndx >> 4) & 3,
                                 (ndx >> 2) & 3,
                                 ndx & 3
                             ], 4),
-                        ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) =>
+                        ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) =>
                             (vec![
                                 (ndx >> 7) & 1,
                                 (ndx >> 6) & 1,
@@ -1716,6 +1807,72 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                 }
                 raw_ndx.push(ndx_line_raw.clone());
             },
+            ColorType::GRAY(Grayscale::G8) => {
+                ndx_line = Vec::new();
+                let mut gray_line = Vec::new();
+
+                (0 .. width).step_by(1).for_each(|ox| {
+                    let x = ox;
+                    let value = add(slice[ox + 1], png_rev(
+                        if x < 1 { 0 } else { (ndx_line[x - 1]) as u8},
+                        (ndx_above[x] ) as u8,
+                        if x < 1 { 0 } else { (ndx_above[x - 1]) as u8 },
+                        est
+                    ));
+
+                    ndx_line.push(value);
+
+                    let val = (value as u32 * 0xffff_u32 / 0xff_u32) as u16;
+
+                    gray_line.push(value as u16);
+
+                    line.push((
+                        val,
+                        val,
+                        val,
+                        0xffff_u16
+                    ));
+                });
+                raw_gray.push(gray_line);
+            },
+            ColorType::GRAYA(Grayscale::G8) => {
+                ndx_line = Vec::new();
+                let mut graya_line = Vec::new();
+
+                (0 .. width).step_by(2).for_each(|ox| {
+                    let x = ox >> 1;
+
+                    let value = add(slice[ox + 1], png_rev(
+                        if x < 1 { 0 } else { (ndx_line[x - 1] ) as u8},
+                        (ndx_above[x] ) as u8,
+                        if x < 1 { 0 } else { (ndx_above[x - 1] ) as u8 },
+                        est
+                    ));
+
+                    let avalue = add(slice[ox + 2], png_rev(
+                        if x < 1 { 0 } else { (ndx_line[x - 1] ) as u8},
+                        (ndx_above[x] ) as u8,
+                        if x < 1 { 0 } else { (ndx_above[x - 1] ) as u8 },
+                        est
+                    ));
+
+                    ndx_line.push(value);
+                    ndx_line.push(avalue);
+
+                    let val = (value as u32 * 0xffff_u32 / 0xff_u32) as u16;
+                    let aval = (avalue as u32 * 0xffff_u32 / 0xff_u32) as u16;
+
+                    graya_line.push((value as u16, avalue as u16));
+
+                    line.push((
+                        val,
+                        val,
+                        val,
+                        aval
+                    ));
+                });
+                raw_graya.push(graya_line);
+            },
         };
 
         above = line.clone();
@@ -1742,6 +1899,8 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
             }).collect();
             ImageData::NDX(vec![raw_ndx], pal_rgb, p)
         },
+        ColorType::GRAYA(g) => ImageData::GRAYA(vec![raw_graya], g),
+        ColorType::GRAY(g) => ImageData::GRAY(vec![raw_gray], g),
     };
 
     match status {
@@ -1820,10 +1979,10 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                 2 => if depth == 8 { color_type = ColorType::RGB } else { color_type = ColorType::RGB16 },
                 3 =>
                     match depth {
-                        1 => color_type = ColorType::NDX(Palette::B1),
-                        2 => color_type = ColorType::NDX(Palette::B2),
-                        4 => color_type = ColorType::NDX(Palette::B4),
-                        8 => color_type = ColorType::NDX(Palette::B8),
+                        1 => color_type = ColorType::NDX(Palette::P1),
+                        2 => color_type = ColorType::NDX(Palette::P2),
+                        4 => color_type = ColorType::NDX(Palette::P4),
+                        8 => color_type = ColorType::NDX(Palette::P8),
                         _ => panic!("color depth detection error"),
                     },
                 c => return Err(format!("color type {c} not supported"))
@@ -1853,10 +2012,12 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                 ColorType::RGB16 => (width * 3 * 2 + 1) * height,
                 ColorType::RGBA => (width * 4 + 1) * height,
                 ColorType::RGB => (width * 3 + 1) * height,
-                ColorType::NDXA(Palette::B8) | ColorType::NDX(Palette::B8) => (width + 1) * height,
-                ColorType::NDXA(Palette::B4) | ColorType::NDX(Palette::B4) => ((width + 1) / 2 + 1) * height,
-                ColorType::NDXA(Palette::B2) | ColorType::NDX(Palette::B2) => ((width + 3) / 4 + 1) * height,
-                ColorType::NDXA(Palette::B1) | ColorType::NDX(Palette::B1) => ((width + 7) / 8 + 1) * height,
+                ColorType::NDXA(Palette::P8) | ColorType::NDX(Palette::P8) => (width + 1) * height,
+                ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => ((width + 1) / 2 + 1) * height,
+                ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => ((width + 3) / 4 + 1) * height,
+                ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) / 8 + 1) * height,
+                ColorType::GRAYA(Grayscale::G8) => ((width * 2) + 1) * height,
+                ColorType::GRAY(Grayscale::G8) => (width + 1) * height,
             };
 
             if let Err(e) = deco.read_to_end(&mut unpacked) {
@@ -2445,7 +2606,7 @@ mod tests {
             let fname = format!("tmp/ndx_{est:?}_8.png");
 
             write_apng(&fname,
-                ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B8),
+                ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P8),
                 Some(*est),
                 None,
                 false
@@ -2455,9 +2616,9 @@ mod tests {
 
             assert_eq!(back.width, WIDTH);
             assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDX(Palette::B8));
+            assert_eq!(back.color_type, ColorType::NDX(Palette::P8));
             assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B8));
+            assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P8));
         });
     }
 
@@ -2479,7 +2640,7 @@ mod tests {
             let fname = format!("tmp/ndx_{est:?}_1.png");
 
             write_apng(&fname,
-                ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B1),
+                ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P1),
                 Some(*est),
                 None,
                 false
@@ -2489,9 +2650,9 @@ mod tests {
 
             assert_eq!(back.width, WIDTH);
             assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDX(Palette::B1));
+            assert_eq!(back.color_type, ColorType::NDX(Palette::P1));
             assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B1));
+            assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P1));
         });
     }
 
@@ -2513,7 +2674,7 @@ mod tests {
             let fname = format!("tmp/ndx_{est:?}_2.png");
 
             write_apng(&fname,
-                ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B2),
+                ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P2),
                 Some(*est),
                 None,
                 false
@@ -2523,9 +2684,9 @@ mod tests {
 
             assert_eq!(back.width, WIDTH);
             assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDX(Palette::B2));
+            assert_eq!(back.color_type, ColorType::NDX(Palette::P2));
             assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B2));
+            assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P2));
         });
     }
 
@@ -2547,7 +2708,7 @@ mod tests {
             let fname = format!("tmp/ndx_{est:?}_4.png");
 
             write_apng(&fname,
-                ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B4),
+                ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P4),
                 Some(*est),
                 None,
                 false
@@ -2557,9 +2718,9 @@ mod tests {
 
             assert_eq!(back.width, WIDTH);
             assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDX(Palette::B4));
+            assert_eq!(back.color_type, ColorType::NDX(Palette::P4));
             assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B4));
+            assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P4));
         });
     }
 
@@ -2581,7 +2742,7 @@ mod tests {
             let fname = format!("tmp/ndxa_{est:?}_2.png");
 
             write_apng(&fname,
-                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B2),
+                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P2),
                 Some(*est),
                 None,
                 false
@@ -2591,9 +2752,9 @@ mod tests {
 
             assert_eq!(back.width, WIDTH);
             assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDXA(Palette::B2));
+            assert_eq!(back.color_type, ColorType::NDXA(Palette::P2));
             assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B2));
+            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P2));
         });
     }
 
@@ -2615,7 +2776,7 @@ mod tests {
             let fname = format!("tmp/ndxa_{est:?}_1.png");
 
             write_apng(&fname,
-                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B1),
+                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P1),
                 Some(*est),
                 None,
                 false
@@ -2625,9 +2786,9 @@ mod tests {
 
             assert_eq!(back.width, WIDTH);
             assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDXA(Palette::B1));
+            assert_eq!(back.color_type, ColorType::NDXA(Palette::P1));
             assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B1));
+            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P1));
         });
     }
 
@@ -2649,7 +2810,7 @@ mod tests {
             let fname = format!("tmp/ndxa_{est:?}_4.png");
 
             write_apng(&fname,
-                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B4),
+                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P4),
                 Some(*est),
                 None,
                 false
@@ -2659,9 +2820,9 @@ mod tests {
 
             assert_eq!(back.width, WIDTH);
             assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDXA(Palette::B4));
+            assert_eq!(back.color_type, ColorType::NDXA(Palette::P4));
             assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B4));
+            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P4));
         });
     }
 
@@ -2683,7 +2844,7 @@ mod tests {
             let fname = format!("tmp/ndxa_{est:?}_8.png");
 
             write_apng(&fname,
-                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B8),
+                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P8),
                 Some(*est),
                 None,
                 false
@@ -2693,9 +2854,9 @@ mod tests {
 
             assert_eq!(back.width, WIDTH);
             assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDXA(Palette::B8));
+            assert_eq!(back.color_type, ColorType::NDXA(Palette::P8));
             assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B8));
+            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P8));
         });
     }
 
