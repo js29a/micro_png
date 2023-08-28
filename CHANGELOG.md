@@ -1,3 +1,6 @@
+## 0.3.0 (2023-08-27T21:24:03)
+  - 1, 2 and 4 bits indexed (+ alpha) palette modes OK
+
 ## 0.2.0 (2023-08-27T16:37:41)
   - the builder
 

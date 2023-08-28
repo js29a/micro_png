@@ -87,8 +87,10 @@ supported formats
 | ImageData::RGBA   | 8-bit RGB with alpha                |
 | ImageData::RGB16  | 16-bit RGB without alpha            |
 | ImageData::RGBA16 | 16-bit RGB with alpha               |
-| ImageData::NDX    | 8-bit indexed palette without alpha |
-| ImageData::NDXA   | 8-bit indexed palette with alpha    |
+| ImageData::NDX    | n-bit indexed palette without alpha |
+| ImageData::NDXA   | n-bit indexed palette with alpha    |
+
+where n is 1, 2, 4 or 8
 
 todo
 ====
