@@ -1217,7 +1217,7 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
     png_chunk(&fdat)
 }
 
-/// The complex way to create APNG file.
+/// Create (A)PNG binary using builder. Output: `Vec<u8>`.
 pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
     let image_data = &builder.image_data;
     let filter = builder.filter;
@@ -1389,7 +1389,7 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
     Ok(res)
 }
 
-/// Generate APNG bytes. For explanations see [write_apng].
+/// Generate APNG bytes. For explanations see [write_apng]. Output: `Vec<u8>`.
 pub fn write_apng_u8(image_data: ImageData, filter: Option<Filter>, progress: Option<APNGProgress>, adam_7: bool)
     -> Result<Vec<u8>, String> {
 
@@ -1407,7 +1407,9 @@ pub fn write_apng_u8(image_data: ImageData, filter: Option<Filter>, progress: Op
     build_apng_u8(builder)
 }
 
-/// Write APNG file. For plain PNG use one frame input.
+/// Write (A)PNG file.
+///
+/// For plain PNG use one frame input.
 ///
 /// # Arguments
 ///
@@ -1449,7 +1451,7 @@ pub fn write_apng(fname: &str, image_data: ImageData, filter: Option<Filter>,
     }
 }
 
-/// Create the image using builder.
+/// Create image file using builder.
 ///
 /// # Example
 ///
@@ -2064,7 +2066,7 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
     }
 }
 
-/// Decode PNG. For explanations see [read_png].
+/// Decode PNG. For explanations see [read_png]. Input: `&[u8]`.
 pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
     let header: Vec<u8> = b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a".to_vec();
 
