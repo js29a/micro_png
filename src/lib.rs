@@ -96,7 +96,7 @@ pub enum ColorType {
     RGBA16,
 /// Grayscale without Alpha - [ImageData::GRAY].
     GRAY(Grayscale),
-/// Grayscale with Alpha - [ImageData:GRAYA].
+/// Grayscale with Alpha - [ImageData::GRAYA].
     GRAYA(Grayscale)
 }
 
@@ -942,10 +942,10 @@ fn prepare_frames(image_data: &ImageData) -> Vec<Vec<Vec<RGBA16>>> {
                 frame.iter().map(|line| -> Vec<RGBA16> {
                     line.iter().map(|pix| -> RGBA16 {
                         (
-                            (*pix).0,
+                            pix.0,
                             0,
                             0,
-                            (*pix).1
+                            pix.1
                         )
                     }).collect()
                 }).collect()
@@ -955,7 +955,7 @@ fn prepare_frames(image_data: &ImageData) -> Vec<Vec<Vec<RGBA16>>> {
                 frame.iter().map(|line| -> Vec<RGBA16> {
                     line.iter().map(|pix| -> RGBA16 {
                         (
-                            *pix as u16,
+                            *pix,
                             0,
                             0,
                             0
@@ -1873,9 +1873,9 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                 (0 .. width).step_by(1).for_each(|ox| {
                     let x = ox;
                     let value = add(slice[ox + 1], png_rev(
-                        if x < 1 { 0 } else { (ndx_line[x - 1]) as u8},
-                        (ndx_above[x] ) as u8,
-                        if x < 1 { 0 } else { (ndx_above[x - 1]) as u8 },
+                        if x < 1 { 0 } else { ndx_line[x - 1] },
+                        ndx_above[x],
+                        if x < 1 { 0 } else { ndx_above[x - 1]  },
                         est
                     ));
 
@@ -1902,16 +1902,16 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                     let x = ox;
 
                     let value = add(slice[ox + 1], png_rev(
-                        if x < 2 { 0 } else { (ndx_line[x - 2] ) as u8},
-                        (ndx_above[x] ) as u8,
-                        if x < 2 { 0 } else { (ndx_above[x - 2] ) as u8 },
+                        if x < 2 { 0 } else { ndx_line[x - 2] },
+                        ndx_above[x],
+                        if x < 2 { 0 } else { ndx_above[x - 2]  },
                         est
                     ));
 
                     let avalue = add(slice[ox + 2], png_rev(
-                        if x < 2 { 0 } else { (ndx_line[x - 1] ) as u8},
-                        (ndx_above[x + 1] ) as u8,
-                        if x < 2 { 0 } else { (ndx_above[x - 1] ) as u8 },
+                        if x < 2 { 0 } else { ndx_line[x - 1] },
+                        ndx_above[x + 1] ,
+                        if x < 2 { 0 } else { ndx_above[x - 1]  },
                         est
                     ));
 
@@ -1940,18 +1940,18 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                     let x = ox;
 
                     let value_8_h = add(slice[ox + 1], png_rev(
-                        if x < 2 { 0 } else { (ndx_line[x - 2]) as u8},
-                        (ndx_above[x] ) as u8,
-                        if x < 2 { 0 } else { (ndx_above[x - 2]) as u8 },
+                        if x < 2 { 0 } else { ndx_line[x - 2] },
+                        ndx_above[x],
+                        if x < 2 { 0 } else { ndx_above[x - 2]  },
                         est
                     ));
 
                     ndx_line.push(value_8_h);
 
                     let value_8_l = add(slice[ox + 2], png_rev(
-                        if x < 2 { 0 } else { (ndx_line[x - 1]) as u8},
-                        (ndx_above[x + 1] ) as u8,
-                        if x < 2 { 0 } else { (ndx_above[x - 1]) as u8 },
+                        if x < 2 { 0 } else { ndx_line[x - 1] },
+                        ndx_above[x + 1],
+                        if x < 2 { 0 } else { ndx_above[x - 1]  },
                         est
                     ));
 
@@ -1959,7 +1959,7 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
 
                     let val = ((value_8_h as u16) << 8) | value_8_l as u16;
 
-                    gray_line.push(val as u16);
+                    gray_line.push(val);
 
                     line.push((
                         val,
@@ -1978,36 +1978,36 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                     let x = ox;
 
                     let value_8_h = add(slice[ox + 1], png_rev(
-                        if x < 4 { 0 } else { (ndx_line[x - 4]) as u8},
-                        (ndx_above[x] ) as u8,
-                        if x < 4 { 0 } else { (ndx_above[x - 4]) as u8 },
+                        if x < 4 { 0 } else { ndx_line[x - 4] },
+                        ndx_above[x],
+                        if x < 4 { 0 } else { ndx_above[x - 4]  },
                         est
                     ));
 
                     ndx_line.push(value_8_h);
 
                     let value_8_l = add(slice[ox + 2], png_rev(
-                        if x < 4 { 0 } else { (ndx_line[x - 3]) as u8},
-                        (ndx_above[x + 1] ) as u8,
-                        if x < 4 { 0 } else { (ndx_above[x - 3]) as u8 },
+                        if x < 4 { 0 } else { ndx_line[x - 3] },
+                        ndx_above[x + 1],
+                        if x < 4 { 0 } else { ndx_above[x - 3]  },
                         est
                     ));
 
                     ndx_line.push(value_8_l);
 
                     let avalue_8_h = add(slice[ox + 3], png_rev(
-                        if x < 4 { 0 } else { (ndx_line[x - 2]) as u8},
-                        (ndx_above[x + 2] ) as u8,
-                        if x < 4 { 0 } else { (ndx_above[x - 2]) as u8 },
+                        if x < 4 { 0 } else { ndx_line[x - 2] },
+                        ndx_above[x + 2],
+                        if x < 4 { 0 } else { ndx_above[x - 2]  },
                         est
                     ));
 
                     ndx_line.push(avalue_8_h);
 
                     let avalue_8_l = add(slice[ox + 4], png_rev(
-                        if x < 4 { 0 } else { (ndx_line[x - 1]) as u8},
-                        (ndx_above[x + 3] ) as u8,
-                        if x < 4 { 0 } else { (ndx_above[x - 1]) as u8 },
+                        if x < 4 { 0 } else { ndx_line[x - 1] },
+                        ndx_above[x + 3],
+                        if x < 4 { 0 } else { ndx_above[x - 1]  },
                         est
                     ));
 
