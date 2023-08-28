@@ -812,8 +812,8 @@ fn png_paeth(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) ->
             ColorType::GRAYA(Grayscale::G16) => vec![
                 sub((pix.0 >> 8) as u8, paeth(a0h, b0h, c0h)),
                 sub((pix.0 & 0xff) as u8, paeth(a0l, b0l, c0l)),
-                sub((pix.3 >> 8) as u8, paeth(c3h, b3h, c3h)),
-                sub((pix.3 & 0xff) as u8, paeth(c3l, b3l, c3l)),
+                sub((pix.3 >> 8) as u8, paeth(a3h, b3h, c3h)),
+                sub((pix.3 & 0xff) as u8, paeth(a3l, b3l, c3l)),
             ],
         };
 
@@ -1932,9 +1932,6 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                 });
                 raw_graya.push(graya_line);
             },
-
-
-
             ColorType::GRAY(Grayscale::G16) => {
                 ndx_line = Vec::new();
                 let mut gray_line = Vec::new();
@@ -1977,31 +1974,49 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                 ndx_line = Vec::new();
                 let mut graya_line = Vec::new();
 
-                (0 .. width * 2).step_by(2).for_each(|ox| {
+                (0 .. width * 4).step_by(4).for_each(|ox| {
                     let x = ox;
 
-                    let value = add(slice[ox + 1], png_rev(
-                        if x < 2 { 0 } else { (ndx_line[x - 2] ) as u8},
+                    let value_8_h = add(slice[ox + 1], png_rev(
+                        if x < 4 { 0 } else { (ndx_line[x - 4]) as u8},
                         (ndx_above[x] ) as u8,
-                        if x < 2 { 0 } else { (ndx_above[x - 2] ) as u8 },
+                        if x < 4 { 0 } else { (ndx_above[x - 4]) as u8 },
                         est
                     ));
 
-                    let avalue = add(slice[ox + 2], png_rev(
-                        if x < 2 { 0 } else { (ndx_line[x - 1] ) as u8},
+                    ndx_line.push(value_8_h);
+
+                    let value_8_l = add(slice[ox + 2], png_rev(
+                        if x < 4 { 0 } else { (ndx_line[x - 3]) as u8},
                         (ndx_above[x + 1] ) as u8,
-                        if x < 2 { 0 } else { (ndx_above[x - 1] ) as u8 },
+                        if x < 4 { 0 } else { (ndx_above[x - 3]) as u8 },
                         est
                     ));
 
+                    ndx_line.push(value_8_l);
 
-                    ndx_line.push(value);
-                    ndx_line.push(avalue);
+                    let avalue_8_h = add(slice[ox + 3], png_rev(
+                        if x < 4 { 0 } else { (ndx_line[x - 2]) as u8},
+                        (ndx_above[x + 2] ) as u8,
+                        if x < 4 { 0 } else { (ndx_above[x - 2]) as u8 },
+                        est
+                    ));
 
-                    let val = (value as u32 * 0xffff_u32 / 0xff_u32) as u16;
-                    let aval = (avalue as u32 * 0xffff_u32 / 0xff_u32) as u16;
+                    ndx_line.push(avalue_8_h);
 
-                    graya_line.push((value as u16, avalue as u16));
+                    let avalue_8_l = add(slice[ox + 4], png_rev(
+                        if x < 4 { 0 } else { (ndx_line[x - 1]) as u8},
+                        (ndx_above[x + 3] ) as u8,
+                        if x < 4 { 0 } else { (ndx_above[x - 1]) as u8 },
+                        est
+                    ));
+
+                    ndx_line.push(avalue_8_l);
+
+                    let val = ((value_8_h as u16) << 8) | value_8_l as u16;
+                    let aval = ((avalue_8_h as u16) << 8) | avalue_8_l as u16;
+
+                    graya_line.push((val, aval));
 
                     line.push((
                         val,
@@ -2012,7 +2027,6 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                 });
                 raw_graya.push(graya_line);
             },
-
         };
 
         above = line.clone();
