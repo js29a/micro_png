@@ -45,15 +45,15 @@ pub enum Palette {
 /// Grayscale bits count (see [ImageData::GRAY] and [ImageData::GRAYA]).
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
 pub enum Grayscale {
-/// One-bit - 2 levels,
+/// One-bit - 2 levels, without alpha.
     G1,
-/// Two-bit - 4 levels,
+/// Two-bit - 4 levels, without alpha.
     G2,
-/// Four-bit - 16 levels,
+/// Four-bit - 16 levels, without alpha.
     G4,
-/// Eigth-bit - 256 levels.
+/// Eigth-bit - 256 levels, with or without alpha.
     G8,
-/// Sixteen-bit - 65536 levels.
+/// Sixteen-bit - 65536 levels, with or without alpha.
     G16
 }
 
@@ -103,6 +103,10 @@ pub enum ColorType {
 /// Grayscale without Alpha - [ImageData::GRAY].
     GRAY(Grayscale),
 /// Grayscale with Alpha - [ImageData::GRAYA].
+///
+/// # Note
+///
+/// The specification covers only 8 and 16 bits here.
     GRAYA(Grayscale)
 }
 
@@ -130,6 +134,10 @@ pub enum ImageData {
 /// Grayscale without Alpha.
     GRAY(Vec<Vec<Vec<u16>>>, Grayscale),
 /// Grayscale with Alpha.
+///
+/// # Note
+///
+/// The specification covers only 8 and 16 bits here.
     GRAYA(Vec<Vec<Vec<(u16, u16)>>>, Grayscale),
 }
 
