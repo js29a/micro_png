@@ -1428,7 +1428,7 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
         ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAYA(Grayscale::G1) =>
-            return Err(format!("forbidden by PNG specification")),
+            return Err("forbidden by PNG specification".to_string()),
         _ => ()
     };
 
@@ -2246,12 +2246,10 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
             ColorType::GRAYA(Grayscale::G4) |
             ColorType::GRAYA(Grayscale::G2) |
             ColorType::GRAYA(Grayscale::G1) =>
-                return Err(format!("forbidden by specification")),
+                return Err("forbidden by specification".to_string()),
             ColorType::GRAY(Grayscale::G4) |
             ColorType::GRAY(Grayscale::G2) |
             ColorType::GRAY(Grayscale::G1) => {
-                let mut gray_line: Vec<u16> = Vec::new();
-
                 let line_width = match color_type {
                     ColorType::GRAY(Grayscale::G4) => (width + 1) / 2,
                     ColorType::GRAY(Grayscale::G2) => (width + 3) / 4,
