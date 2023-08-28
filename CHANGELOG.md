@@ -1,3 +1,6 @@
+## 0.3.1 (2023-08-28T15:21:53)
+  - 8/16 bit grayscale with and without alpha
+
 ## 0.3.0 (2023-08-27T21:24:03)
   - 1, 2 and 4 bits indexed (+ alpha) palette modes OK
 
