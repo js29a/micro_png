@@ -180,7 +180,7 @@ impl Image {
 pub struct APNGBuilder {
     fname: String,
     image_data: ImageData,
-    forced: Option<Filter>,
+    filter: Option<Filter>,
     progress: Option<APNGProgress>,
     adam_7: bool,
     repeat: u32,
@@ -200,7 +200,7 @@ impl APNGBuilder {
         Self {
             fname: fname.to_string(),
             image_data,
-            forced: None,
+            filter: None,
             progress: None,
             adam_7: false,
             repeat: 0,
@@ -213,13 +213,13 @@ impl APNGBuilder {
 
 /// Force using a filter.
     pub fn set_filter(mut self, new_filter: Filter) -> Self {
-        self.forced = Some(new_filter);
+        self.filter = Some(new_filter);
         self
     }
 
-/// Clear using forced filter.
+/// Clear using filter filter.
     pub fn clear_filter(mut self) -> Self {
-        self.forced = None;
+        self.filter = None;
         self
     }
 
@@ -896,7 +896,7 @@ struct Stats {
 
 #[allow(clippy::too_many_arguments)]
 fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
-    stats: &mut Stats, ndx: u32, forced: Option<Filter>, seq: &mut u32, frames: &Vec<Vec<Vec<RGBA16>>>,
+    stats: &mut Stats, ndx: u32, filter: Option<Filter>, seq: &mut u32, frames: &Vec<Vec<Vec<RGBA16>>>,
     adam_7: bool) -> Vec<u8> {
 
     let preds_first: Vec<(Filter, Pred)> = vec![
@@ -1006,7 +1006,7 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
             };
 
             if first {
-                match forced {
+                match filter {
                     Some(Filter::None) => {
                         let p_none = png_none(&line[..], &[], color_type);
                         payload.extend(&p_none);
@@ -1033,7 +1033,7 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
                 first = false;
             }
             else {
-                match forced {
+                match filter {
                     Some(Filter::None) => {
                         stats.n_none += 1;
                         payload.extend(png_none(&line[..], &above[..], color_type));
@@ -1088,7 +1088,7 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
 /// The complex way to create APNG file.
 pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
     let image_data = &builder.image_data;
-    let forced = builder.forced;
+    let filter = builder.filter;
     let progress = builder.progress;
     let mut adam_7 = builder.adam_7;
 
@@ -1226,7 +1226,7 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
             },
             &mut stats,
             ndx,
-            forced,
+            filter,
             &mut seq,
             &frames,
             adam_7
@@ -1252,13 +1252,13 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
 }
 
 /// Generate APNG bytes. For explanations see [write_apng].
-pub fn write_apng_u8(image_data: ImageData, forced: Option<Filter>, progress: Option<APNGProgress>, adam_7: bool)
+pub fn write_apng_u8(image_data: ImageData, filter: Option<Filter>, progress: Option<APNGProgress>, adam_7: bool)
     -> Result<Vec<u8>, String> {
 
     let mut builder = APNGBuilder::new("", image_data)
         .set_adam_7(adam_7);
 
-    if let Some(f) = forced {
+    if let Some(f) = filter {
         builder = builder.set_filter(f)
     }
 
@@ -1275,7 +1275,7 @@ pub fn write_apng_u8(image_data: ImageData, forced: Option<Filter>, progress: Op
 ///
 /// * `fname` - output filename,
 /// * `image_data` - the image,
-/// * `forced` - force to use a filter,
+/// * `filter` - force to use a filter,
 /// * `progress` - write progress callback,
 /// * `adam_7` - flag to use Adam7 output.
 ///
@@ -1296,10 +1296,10 @@ pub fn write_apng_u8(image_data: ImageData, forced: Option<Filter>, progress: Op
 ///        false // no Adam-7
 ///    ).expect("can't save back.png");
 /// ```
-pub fn write_apng(fname: &str, image_data: ImageData, forced: Option<Filter>,
+pub fn write_apng(fname: &str, image_data: ImageData, filter: Option<Filter>,
     progress: Option<APNGProgress>, adam_7: bool) -> Result<(), String> {
     if let Ok(mut f) = File::create(fname) {
-        if f.write_all(&write_apng_u8(image_data, forced, progress, adam_7)?).is_err() {
+        if f.write_all(&write_apng_u8(image_data, filter, progress, adam_7)?).is_err() {
             Err(format!("write error: {fname}"))
         }
         else {
@@ -2053,9 +2053,12 @@ pub fn read_png(fname: &str) -> Result<Image, String> {
 mod tests {
     use super::*;
 
+    const WIDTH: usize = 133;
+    const HEIGHT: usize = 193;
+
     fn image_rgba() -> (Vec<Vec<RGBA16>>, Vec<Vec<RGBA>>) {
-        let w = 256_usize;
-        let h = 196_usize;
+        let w = WIDTH;
+        let h = HEIGHT;
 
         let mut res: Vec<Vec<RGBA>> = Vec::new();
         let mut orig: Vec<Vec<RGBA16>> = Vec::new();
@@ -2090,8 +2093,8 @@ mod tests {
     }
 
     fn image_rgba_16() -> (Vec<Vec<RGBA16>>, Vec<Vec<RGBA16>>) {
-        let w = 256_usize;
-        let h = 196_usize;
+        let w = WIDTH;
+        let h = HEIGHT;
 
         let mut res: Vec<Vec<RGBA16>> = Vec::new();
         let mut orig: Vec<Vec<RGBA16>> = Vec::new();
@@ -2123,8 +2126,8 @@ mod tests {
     }
 
     fn image_rgb() -> (Vec<Vec<RGBA16>>, Vec<Vec<RGB>>) {
-        let w = 256_usize;
-        let h = 196_usize;
+        let w = WIDTH;
+        let h = HEIGHT;
 
         let mut res_orig: Vec<Vec<RGBA16>> = Vec::new();
         let mut res_data: Vec<Vec<RGB>> = Vec::new();
@@ -2158,8 +2161,8 @@ mod tests {
     }
 
     fn image_rgb_16() -> (Vec<Vec<RGBA16>>, Vec<Vec<RGB16>>) {
-        let w = 256_usize;
-        let h = 196_usize;
+        let w = WIDTH;
+        let h = HEIGHT;
 
         let mut res_orig: Vec<Vec<RGBA16>> = Vec::new();
         let mut res_data: Vec<Vec<RGB16>> = Vec::new();
@@ -2194,8 +2197,8 @@ mod tests {
                                 Vec<RGB>) { // palette
         assert!(ps == 2 || ps == 4 || ps == 16 || ps == 256);
 
-        let w = 133_usize;
-        let h = 196_usize;
+        let w = WIDTH;
+        let h = HEIGHT;
 
         let mut pal = vec![(0, 0, 0); ps];
 
@@ -2239,8 +2242,8 @@ mod tests {
                                  Vec<RGBA>) { // palette
         assert!(ps == 2 || ps == 4 || ps == 16 || ps == 256);
 
-        let w = 133_usize;
-        let h = 196_usize;
+        let w = WIDTH;
+        let h = HEIGHT;
 
         let mut pal = vec![(0, 0, 0, 0); ps];
 
@@ -2306,8 +2309,8 @@ mod tests {
 
             let back = read_png(&fname).unwrap();
 
-            assert_eq!(back.width, 256);
-            assert_eq!(back.height, 196);
+            assert_eq!(back.width, WIDTH);
+            assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::RGBA);
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::RGBA(vec![image.clone()]));
@@ -2348,8 +2351,8 @@ mod tests {
 
             let back = read_png(&fname).unwrap();
 
-            assert_eq!(back.width, 256);
-            assert_eq!(back.height, 196);
+            assert_eq!(back.width, WIDTH);
+            assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::RGBA16);
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::RGBA16(vec![image.clone()]));
@@ -2382,8 +2385,8 @@ mod tests {
 
             let back = read_png(&fname).unwrap();
 
-            assert_eq!(back.width, 256);
-            assert_eq!(back.height, 196);
+            assert_eq!(back.width, WIDTH);
+            assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::RGB);
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::RGB(vec![data.clone()]));
@@ -2416,8 +2419,8 @@ mod tests {
 
             let back = read_png(&fname).unwrap();
 
-            assert_eq!(back.width, 256);
-            assert_eq!(back.height, 196);
+            assert_eq!(back.width, WIDTH);
+            assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::RGB16);
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::RGB16(vec![data.clone()]));
@@ -2450,8 +2453,8 @@ mod tests {
 
             let back = read_png(&fname).unwrap();
 
-            assert_eq!(back.width, 133);
-            assert_eq!(back.height, 196);
+            assert_eq!(back.width, WIDTH);
+            assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::NDX(Palette::B8));
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B8));
@@ -2484,8 +2487,8 @@ mod tests {
 
             let back = read_png(&fname).unwrap();
 
-            assert_eq!(back.width, 133);
-            assert_eq!(back.height, 196);
+            assert_eq!(back.width, WIDTH);
+            assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::NDX(Palette::B1));
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B1));
@@ -2518,8 +2521,8 @@ mod tests {
 
             let back = read_png(&fname).unwrap();
 
-            assert_eq!(back.width, 133);
-            assert_eq!(back.height, 196);
+            assert_eq!(back.width, WIDTH);
+            assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::NDX(Palette::B2));
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B2));
@@ -2552,8 +2555,8 @@ mod tests {
 
             let back = read_png(&fname).unwrap();
 
-            assert_eq!(back.width, 133);
-            assert_eq!(back.height, 196);
+            assert_eq!(back.width, WIDTH);
+            assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::NDX(Palette::B4));
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::B4));
@@ -2586,8 +2589,8 @@ mod tests {
 
             let back = read_png(&fname).unwrap();
 
-            assert_eq!(back.width, 133);
-            assert_eq!(back.height, 196);
+            assert_eq!(back.width, WIDTH);
+            assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::NDXA(Palette::B2));
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B2));
@@ -2620,8 +2623,8 @@ mod tests {
 
             let back = read_png(&fname).unwrap();
 
-            assert_eq!(back.width, 133);
-            assert_eq!(back.height, 196);
+            assert_eq!(back.width, WIDTH);
+            assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::NDXA(Palette::B1));
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B1));
@@ -2654,8 +2657,8 @@ mod tests {
 
             let back = read_png(&fname).unwrap();
 
-            assert_eq!(back.width, 133);
-            assert_eq!(back.height, 196);
+            assert_eq!(back.width, WIDTH);
+            assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::NDXA(Palette::B4));
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B4));
@@ -2688,8 +2691,8 @@ mod tests {
 
             let back = read_png(&fname).unwrap();
 
-            assert_eq!(back.width, 133);
-            assert_eq!(back.height, 196);
+            assert_eq!(back.width, WIDTH);
+            assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::NDXA(Palette::B8));
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::B8));
