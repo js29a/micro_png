@@ -2274,7 +2274,7 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                 ndx_line = Vec::new();
                 ndx_line_raw = Vec::new();
                 let mut gray_line = Vec::new();
-                println!("{slice:?}");
+                //println!("{slice:?}");
                 //let mut ndx_line: Vec<u8> = Vec::new();
                 let gray_status = (0 .. line_width).map(|ox| -> Result<(), String> {
                     let x = ox;
@@ -3171,10 +3171,15 @@ mod tests {
     }
 
     #[test]
-    pub fn test_ndx_8_all() {
-        let (orig, data, pal) = image_ndx(256);
+    pub fn test_ndx() {
+        let presets = vec![
+            (8, Palette::P8),
+            (4, Palette::P4),
+            (2, Palette::P2),
+            (1, Palette::P1),
+        ];
 
-        let types = vec![
+        let filters = vec![
             Filter::None,
             Filter::Sub,
             Filter::Up,
@@ -3182,33 +3187,44 @@ mod tests {
             Filter::Paeth
         ];
 
-        types.iter().for_each(|est| {
-            println!("{est:?}");
+        presets.iter().for_each(|(ps, pt)| {
+            filters.iter().for_each(|ft| {
+                let nc = 1 << ps;
+                println!("{ps} {nc} {pt:?} {ft:?}");
 
-            let fname = format!("tmp/ndx_{est:?}_8.png");
+                let fname = format!("tmp/ndx_{ft:?}_{ps}.png");
+                let fname_a7 = format!("tmp/ndx_{ft:?}_{ps}_a7.png");
 
-            write_apng(&fname,
-                ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P8),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
+                let (orig, data, pal) = image_ndx(nc);
 
-            let back = read_png(&fname).unwrap();
+                write_apng(&fname,
+                    ImageData::NDX(vec![data.clone()], pal.clone(), *pt),
+                    Some(*ft),
+                    None,
+                    false
+                ).unwrap();
 
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDX(Palette::P8));
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P8));
+                let back = read_png(&fname).unwrap();
+
+                assert_eq!(back.width, WIDTH);
+                assert_eq!(back.height, HEIGHT);
+                assert_eq!(back.color_type, ColorType::NDX(*pt));
+                assert_eq!(back.data, orig);
+                assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), *pt));
+            });
         });
     }
 
     #[test]
-    pub fn test_ndx_1_all() {
-        let (orig, data, pal) = image_ndx(2);
+    pub fn test_ndxa() {
+        let presets = vec![
+            (8, Palette::P8),
+            (4, Palette::P4),
+            (2, Palette::P2),
+            (1, Palette::P1),
+        ];
 
-        let types = vec![
+        let filters = vec![
             Filter::None,
             Filter::Sub,
             Filter::Up,
@@ -3216,33 +3232,45 @@ mod tests {
             Filter::Paeth
         ];
 
-        types.iter().for_each(|est| {
-            println!("{est:?}");
+        presets.iter().for_each(|(ps, pt)| {
+            filters.iter().for_each(|ft| {
+                let nc = 1 << ps;
+                println!("{ps} {nc} {ft:?}");
 
-            let fname = format!("tmp/ndx_{est:?}_1.png");
+                let fname = format!("tmp/ndxa_{ft:?}_{ps}.png");
+                let fname_a7 = format!("tmp/ndxa_{ft:?}_{ps}_a7.png");
 
-            write_apng(&fname,
-                ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P1),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
+                let (orig, data, pal) = image_ndxa(nc);
 
-            let back = read_png(&fname).unwrap();
+                write_apng(&fname,
+                    ImageData::NDXA(vec![data.clone()], pal.clone(), *pt),
+                    Some(*ft),
+                    None,
+                    false
+                ).unwrap();
 
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDX(Palette::P1));
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P1));
+                let back = read_png(&fname).unwrap();
+
+                assert_eq!(back.width, WIDTH);
+                assert_eq!(back.height, HEIGHT);
+                assert_eq!(back.color_type, ColorType::NDXA(*pt));
+                assert_eq!(back.data, orig);
+                assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), *pt));
+            });
         });
     }
 
     #[test]
-    pub fn test_ndx_2_all() {
-        let (orig, data, pal) = image_ndx(4);
+    pub fn test_gs() {
+        let presets = vec![
+            (16, Grayscale::G16),
+            (8,  Grayscale::G8),
+            (4,  Grayscale::G4),
+            (2,  Grayscale::G2),
+            (1,  Grayscale::G1),
+        ];
 
-        let types = vec![
+        let filters = vec![
             Filter::None,
             Filter::Sub,
             Filter::Up,
@@ -3250,33 +3278,41 @@ mod tests {
             Filter::Paeth
         ];
 
-        types.iter().for_each(|est| {
-            println!("{est:?}");
+        presets.iter().for_each(|(gw, gt)| {
+            filters.iter().for_each(|ft| {
+                println!("{gw} {gt:?} {ft:?}");
 
-            let fname = format!("tmp/ndx_{est:?}_2.png");
+                let fname = format!("tmp/gs_{ft:?}_{gw}.png");
+                let fname_a7 = format!("tmp/gs_{ft:?}_{gw}_a7.png");
 
-            write_apng(&fname,
-                ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P2),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
+                let (orig, data) = image_gs(*gw);
 
-            let back = read_png(&fname).unwrap();
+                write_apng(&fname,
+                    ImageData::GRAY(vec![data.clone()], *gt),
+                    Some(*ft),
+                    None,
+                    false
+                ).unwrap();
 
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDX(Palette::P2));
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P2));
+                let back = read_png(&fname).unwrap();
+
+                assert_eq!(back.width, WIDTH);
+                assert_eq!(back.height, HEIGHT);
+                assert_eq!(back.color_type, ColorType::GRAY(*gt));
+                assert_eq!(back.data, orig);
+                assert_eq!(back.raw, ImageData::GRAY(vec![data.clone()], *gt));
+            });
         });
     }
 
     #[test]
-    pub fn test_ndx_4_all() {
-        let (orig, data, pal) = image_ndx(16);
+    pub fn test_gsa() {
+        let presets = vec![
+            (16, Grayscale::G16),
+            (8,  Grayscale::G8),
+        ];
 
-        let types = vec![
+        let filters = vec![
             Filter::None,
             Filter::Sub,
             Filter::Up,
@@ -3284,402 +3320,30 @@ mod tests {
             Filter::Paeth
         ];
 
-        types.iter().for_each(|est| {
-            println!("{est:?}");
-
-            let fname = format!("tmp/ndx_{est:?}_4.png");
-
-            write_apng(&fname,
-                ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P4),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
-
-            let back = read_png(&fname).unwrap();
-
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDX(Palette::P4));
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), Palette::P4));
-        });
-    }
-
-    #[test]
-    pub fn test_ndxa_2_all() {
-        let (orig, data, pal) = image_ndxa(4);
-
-        let types = vec![
-            Filter::None,
-            Filter::Sub,
-            Filter::Up,
-            Filter::Avg,
-            Filter::Paeth
-        ];
-
-        types.iter().for_each(|est| {
-            println!("{est:?}");
-
-            let fname = format!("tmp/ndxa_{est:?}_2.png");
-
-            write_apng(&fname,
-                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P2),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
-
-            let back = read_png(&fname).unwrap();
-
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDXA(Palette::P2));
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P2));
-        });
-    }
-
-    #[test]
-    pub fn test_ndxa_1_all() {
-        let (orig, data, pal) = image_ndxa(2);
-
-        let types = vec![
-            Filter::None,
-            Filter::Sub,
-            Filter::Up,
-            Filter::Avg,
-            Filter::Paeth
-        ];
-
-        types.iter().for_each(|est| {
-            println!("{est:?}");
-
-            let fname = format!("tmp/ndxa_{est:?}_1.png");
-
-            write_apng(&fname,
-                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P1),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
-
-            let back = read_png(&fname).unwrap();
-
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDXA(Palette::P1));
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P1));
-        });
-    }
-
-    #[test]
-    pub fn test_ndxa_4_all() {
-        let (orig, data, pal) = image_ndxa(16);
-
-        let types = vec![
-            Filter::None,
-            Filter::Sub,
-            Filter::Up,
-            Filter::Avg,
-            Filter::Paeth
-        ];
-
-        types.iter().for_each(|est| {
-            println!("{est:?}");
-
-            let fname = format!("tmp/ndxa_{est:?}_4.png");
-
-            write_apng(&fname,
-                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P4),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
-
-            let back = read_png(&fname).unwrap();
-
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDXA(Palette::P4));
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P4));
-        });
-    }
-
-    #[test]
-    pub fn test_ndxa_8_all() {
-        let (orig, data, pal) = image_ndxa(256);
-
-        let types = vec![
-            Filter::None,
-            Filter::Sub,
-            Filter::Up,
-            Filter::Avg,
-            Filter::Paeth
-        ];
-
-        types.iter().for_each(|est| {
-            println!("{est:?}");
-
-            let fname = format!("tmp/ndxa_{est:?}_8.png");
-
-            write_apng(&fname,
-                ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P8),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
-
-            let back = read_png(&fname).unwrap();
-
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::NDXA(Palette::P8));
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), Palette::P8));
-        });
-    }
-
-    #[test]
-    pub fn test_gs_4() {
-        let (orig, data) = image_gs(4);
-
-        let types = vec![
-            Filter::None,
-            Filter::Sub,
-            Filter::Up,
-            Filter::Avg,
-            Filter::Paeth
-        ];
-
-        types.iter().for_each(|est| {
-            println!("{est:?}");
-
-            let fname = format!("tmp/gs_{est:?}_4.png");
-
-            write_apng(&fname,
-                ImageData::GRAY(vec![data.clone()], Grayscale::G4),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
-
-            let back = read_png(&fname).unwrap();
-
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::GRAY(Grayscale::G4));
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::GRAY(vec![data.clone()], Grayscale::G4));
-        });
-    }
-
-    #[test]
-    pub fn test_gs_2() {
-        let (orig, data) = image_gs(2);
-
-        let types = vec![
-            Filter::None,
-            Filter::Sub,
-            Filter::Up,
-            Filter::Avg,
-            Filter::Paeth
-        ];
-
-        types.iter().for_each(|est| {
-            println!("{est:?}");
-
-            let fname = format!("tmp/gs_{est:?}_2.png");
-
-            write_apng(&fname,
-                ImageData::GRAY(vec![data.clone()], Grayscale::G2),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
-
-            let back = read_png(&fname).unwrap();
-
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::GRAY(Grayscale::G2));
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::GRAY(vec![data.clone()], Grayscale::G2));
-        });
-    }
-
-    #[test]
-    pub fn test_gs_1() {
-        let (orig, data) = image_gs(1);
-
-        let types = vec![
-            Filter::None,
-            Filter::Sub,
-            Filter::Up,
-            Filter::Avg,
-            Filter::Paeth
-        ];
-
-        types.iter().for_each(|est| {
-            println!("{est:?}");
-
-            let fname = format!("tmp/gs_{est:?}_1.png");
-
-            write_apng(&fname,
-                ImageData::GRAY(vec![data.clone()], Grayscale::G1),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
-
-            let back = read_png(&fname).unwrap();
-
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::GRAY(Grayscale::G1));
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::GRAY(vec![data.clone()], Grayscale::G1));
-        });
-    }
-
-    #[test]
-    pub fn test_gs_8() {
-        let (orig, data) = image_gs(8);
-
-        let types = vec![
-            Filter::None,
-            Filter::Sub,
-            Filter::Up,
-            Filter::Avg,
-            Filter::Paeth
-        ];
-
-        types.iter().for_each(|est| {
-            println!("{est:?}");
-
-            let fname = format!("tmp/gs_{est:?}_8.png");
-
-            write_apng(&fname,
-                ImageData::GRAY(vec![data.clone()], Grayscale::G8),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
-
-            let back = read_png(&fname).unwrap();
-
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::GRAY(Grayscale::G8));
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::GRAY(vec![data.clone()], Grayscale::G8));
-        });
-    }
-
-
-    #[test]
-    pub fn test_gsa_8() {
-        let (orig, data) = image_gsa(8);
-
-        let types = vec![
-            Filter::None,
-            Filter::Sub,
-            Filter::Up,
-            Filter::Avg,
-            Filter::Paeth
-        ];
-
-        types.iter().for_each(|est| {
-            println!("{est:?}");
-
-            let fname = format!("tmp/gsa_{est:?}_8.png");
-
-            write_apng(&fname,
-                ImageData::GRAYA(vec![data.clone()], Grayscale::G8),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
-
-            let back = read_png(&fname).unwrap();
-
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::GRAYA(Grayscale::G8));
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::GRAYA(vec![data.clone()], Grayscale::G8));
-        });
-    }
-
-    #[test]
-    pub fn test_gs_16() {
-        let (orig, data) = image_gs(16);
-
-        let types = vec![
-            Filter::None,
-            Filter::Sub,
-            Filter::Up,
-            Filter::Avg,
-            Filter::Paeth
-        ];
-
-        types.iter().for_each(|est| {
-            println!("{est:?}");
-
-            let fname = format!("tmp/gs_{est:?}_16.png");
-
-            write_apng(&fname,
-                ImageData::GRAY(vec![data.clone()], Grayscale::G16),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
-
-            let back = read_png(&fname).unwrap();
-
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::GRAY(Grayscale::G16));
-            assert_eq!(back.data.len(), orig.len());
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::GRAY(vec![data.clone()], Grayscale::G16));
-        });
-    }
-
-    #[test]
-    pub fn test_gsa_16() {
-        let (orig, data) = image_gsa(16);
-
-        let types = vec![
-            Filter::None,
-            Filter::Sub,
-            Filter::Up,
-            Filter::Avg,
-            Filter::Paeth
-        ];
-
-        types.iter().for_each(|est| {
-            println!("{est:?}");
-
-            let fname = format!("tmp/gsa_{est:?}_16.png");
-
-            write_apng(&fname,
-                ImageData::GRAYA(vec![data.clone()], Grayscale::G16),
-                Some(*est),
-                None,
-                false
-            ).unwrap();
-
-            let back = read_png(&fname).unwrap();
-
-            assert_eq!(back.width, WIDTH);
-            assert_eq!(back.height, HEIGHT);
-            assert_eq!(back.color_type, ColorType::GRAYA(Grayscale::G16));
-            assert_eq!(back.data.len(), orig.len());
-            assert_eq!(back.data, orig);
-            assert_eq!(back.raw, ImageData::GRAYA(vec![data.clone()], Grayscale::G16));
+        presets.iter().for_each(|(gw, gt)| {
+            filters.iter().for_each(|ft| {
+                println!("{gw} {gt:?} {ft:?}");
+
+                let fname = format!("tmp/gsa_{ft:?}_{gw}.png");
+                let fname_a7 = format!("tmp/gsa_{ft:?}_{gw}_a7.png");
+
+                let (orig, data) = image_gsa(*gw);
+
+                write_apng(&fname,
+                    ImageData::GRAYA(vec![data.clone()], *gt),
+                    Some(*ft),
+                    None,
+                    false
+                ).unwrap();
+
+                let back = read_png(&fname).unwrap();
+
+                assert_eq!(back.width, WIDTH);
+                assert_eq!(back.height, HEIGHT);
+                assert_eq!(back.color_type, ColorType::GRAYA(*gt));
+                assert_eq!(back.data, orig);
+                assert_eq!(back.raw, ImageData::GRAYA(vec![data.clone()], *gt));
+            });
         });
     }
 

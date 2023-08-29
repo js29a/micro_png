@@ -7,9 +7,9 @@ repository = "https://github.com/js29a/micro_png"
 version = "0.3.2"
 edition = "2021"
 readme = "README.md"
-description = "Low-level minimalist APNG writer and PNG reader with just a few dependencies (8,16-RGB(A), 1,2,4,8-palette, 8,16-Grayscale)."
+description = "Low-level minimalist HDR APNG writer and HDR PNG reader with just a few dependencies (8,16-RGB(A), 1,2,4,8-palette, 8,16-Grayscale)."
 categories = ["multimedia::images"]
-keywords = ["png", "apng"]
+keywords = ["png", "apng", "hdr"]
 
 [dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
