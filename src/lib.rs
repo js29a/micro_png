@@ -3027,7 +3027,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_rgba_all() {
+    pub fn test_rgba() {
         let (orig, image) = image_rgba();
 
         let types = vec![
@@ -3042,12 +3042,20 @@ mod tests {
             println!("{est:?}");
 
             let fname = format!("tmp/rgba_{est:?}.png");
+            let fname_a7 = format!("tmp/rgba_{est:?}_a7.png");
 
             write_apng(&fname,
                 ImageData::RGBA(vec![image.clone()]),
                 Some(*est),
                 None,
                 false
+            ).unwrap();
+
+            write_apng(&fname_a7,
+                ImageData::RGBA(vec![image.clone()]),
+                Some(*est),
+                None,
+                true
             ).unwrap();
 
             let back = read_png(&fname).unwrap();
@@ -3061,7 +3069,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_rgba_16_all() {
+    pub fn test_rgba_16() {
         let (orig, image) = image_rgba_16();
 
         let types = vec![
@@ -3103,7 +3111,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_rgb_all() {
+    pub fn test_rgb() {
         let (orig, data) = image_rgb();
 
         let types = vec![
@@ -3118,12 +3126,20 @@ mod tests {
             println!("{est:?}");
 
             let fname = format!("tmp/rgb_{est:?}.png");
+            let fname_a7 = format!("tmp/rgb_{est:?}_a7.png");
 
             write_apng(&fname,
                 ImageData::RGB(vec![data.clone()]),
                 Some(*est),
                 None,
                 false
+            ).unwrap();
+
+            write_apng(&fname_a7,
+                ImageData::RGB(vec![data.clone()]),
+                Some(*est),
+                None,
+                true
             ).unwrap();
 
             let back = read_png(&fname).unwrap();
@@ -3137,7 +3153,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_rgb_16_all() {
+    pub fn test_rgb_16() {
         let (orig, data) = image_rgb_16();
 
         let types = vec![
@@ -3152,12 +3168,20 @@ mod tests {
             println!("{est:?}");
 
             let fname = format!("tmp/rgb_16_{est:?}.png");
+            let fname_a7 = format!("tmp/rgb_16_{est:?}_a7.png");
 
             write_apng(&fname,
                 ImageData::RGB16(vec![data.clone()]),
                 Some(*est),
                 None,
                 false
+            ).unwrap();
+
+            write_apng(&fname_a7,
+                ImageData::RGB16(vec![data.clone()]),
+                Some(*est),
+                None,
+                true
             ).unwrap();
 
             let back = read_png(&fname).unwrap();
@@ -3202,6 +3226,13 @@ mod tests {
                     Some(*ft),
                     None,
                     false
+                ).unwrap();
+
+                write_apng(&fname_a7,
+                    ImageData::NDX(vec![data.clone()], pal.clone(), *pt),
+                    Some(*ft),
+                    None,
+                    true
                 ).unwrap();
 
                 let back = read_png(&fname).unwrap();
@@ -3249,6 +3280,13 @@ mod tests {
                     false
                 ).unwrap();
 
+                write_apng(&fname_a7,
+                    ImageData::NDXA(vec![data.clone()], pal.clone(), *pt),
+                    Some(*ft),
+                    None,
+                    true
+                ).unwrap();
+
                 let back = read_png(&fname).unwrap();
 
                 assert_eq!(back.width, WIDTH);
@@ -3294,6 +3332,13 @@ mod tests {
                     false
                 ).unwrap();
 
+                write_apng(&fname_a7,
+                    ImageData::GRAY(vec![data.clone()], *gt),
+                    Some(*ft),
+                    None,
+                    true
+                ).unwrap();
+
                 let back = read_png(&fname).unwrap();
 
                 assert_eq!(back.width, WIDTH);
@@ -3334,6 +3379,13 @@ mod tests {
                     Some(*ft),
                     None,
                     false
+                ).unwrap();
+
+                write_apng(&fname_a7,
+                    ImageData::GRAYA(vec![data.clone()], *gt),
+                    Some(*ft),
+                    None,
+                    true
                 ).unwrap();
 
                 let back = read_png(&fname).unwrap();
