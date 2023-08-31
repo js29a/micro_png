@@ -1,6 +1,3 @@
-usage
-=====
-
 project Wiki
 ============
 

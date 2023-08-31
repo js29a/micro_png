@@ -89,7 +89,42 @@ fn from_wiki_copy() {
     build_apng(APNGBuilder::new("tmp/test-HDR.png", ImageData::RGBA16(vec![image.data()]))).unwrap();
 }
 
+fn from_wiki_truecolor() {
+    // 1. generate some RGBA data
+    let mut image_rgba: Vec<Vec<RGBA>> = vec![vec![(0, 0, 0, 0); 64]; 64];
+
+    (0 .. 64).for_each(|y| {
+        (0 .. 64).for_each(|x| {
+            let dy = (32.5 - y as f32) / 32.5;
+            let dx = (32.5 - x as f32) / 32.5;
+            let r = (dx * dx + dy * dy).sqrt();
+            image_rgba[y][x].0 = ((x >> 3) << 5) as u8; // blue
+            image_rgba[y][x].1 = ((y >> 3) << 5) as u8; // green
+            image_rgba[y][x].2 = 0xff; // blue
+            image_rgba[y][x].3 = 255 - (r * 255.0) as u8; // alpha
+        });
+    });
+
+    // 2. write it into a file
+    build_apng(APNGBuilder::new("tmp/test-RGBA.png", ImageData::RGBA(vec![image_rgba]))).unwrap();
+
+    // 3. generate some RGB data
+    let mut image_rgb: Vec<Vec<RGB>> = vec![vec![(0, 0, 0); 64]; 64];
+
+    (0 .. 64).for_each(|y| {
+        (0 .. 64).for_each(|x| {
+            image_rgb[y][x].0 = ((x >> 3) << 5) as u8; // blue
+            image_rgb[y][x].1 = ((y >> 3) << 5) as u8; // green
+            image_rgb[y][x].2 = 0xff; // blue
+        });
+    });
+
+    // 2. write it into a file
+    build_apng(APNGBuilder::new("tmp/test-RGB.png", ImageData::RGB(vec![image_rgb]))).unwrap();
+}
+
 fn main() {
     from_readme();
     from_wiki_copy();
+    from_wiki_truecolor();
 }
