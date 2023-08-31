@@ -146,9 +146,36 @@ fn from_wiki_animation() {
     build_apng(APNGBuilder::new("tmp/test-APNG-RGBA.png", ImageData::RGBA(image_rgba))).unwrap();
 }
 
+fn from_wiki_u8() {
+    // 1. create simple image, actual content is not important here
+    let data: Vec<Vec<RGBA>> = vec![
+        vec![(255, 0, 0, 255), (0, 0, 0, 255)],
+        vec![(0, 0, 0, 255), (255, 0, 0, 255)],
+        vec![(0, 255, 0, 255), (255, 255, 0, 255)],
+    ];
+
+    let orig = data.clone(); // used at point 4.
+
+    // 2. serialize the image
+    let vector: Vec<u8> = build_apng_u8(
+         APNGBuilder::new("tmp/meta.png", ImageData::RGBA(vec![data]))
+     ).expect("can't write into u8");
+
+     // now we have raw bytes in the 'vector' variable
+
+     // 3. read it back from raw bytes
+     let back = read_png_u8(&vector[..]).expect("can't read from u8");
+
+     // 4. verify props to demonstrate the process
+     assert_eq!(back.width(), 2);
+     assert_eq!(back.height(), 3);
+     assert_eq!(*back.raw(), ImageData::RGBA(vec![orig]));
+}
+
 fn main() {
     from_readme();
     from_wiki_copy();
     from_wiki_truecolor();
     from_wiki_animation();
+    from_wiki_u8();
 }
