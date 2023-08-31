@@ -1,3 +1,7 @@
+## 0.3.3 (2023-08-31T18:00:22)
+  - build_apng signature bugfix,
+  - README.md: link to project Wiki
+
 ## 0.3.2 (2023-08-28T18:14:54)
   - 1, 2, 4 - grayscale no alpha OK
 
