@@ -1,3 +1,7 @@
+//! micro_png
+//!
+//! Examples: <https://github.com/js29a/micro_png/wiki>
+
 use std::fs::File;
 use std::io::{Write, Read};
 use std::iter::zip;
@@ -1681,7 +1685,7 @@ pub fn write_apng(fname: &str, image_data: ImageData, filter: Option<Filter>,
 ///             .set_zmeta("Author", "test author")
 ///     ).expect("can't write tmp/builder-test.png");
 /// ```
-pub fn build_apng(builder: APNGBuilder) -> Result<Vec<u8>, String> {
+pub fn build_apng(builder: APNGBuilder) -> Result<(), String> {
     let fname = builder.fname.clone();
 
     if let Ok(mut f) = File::create(&fname) {
@@ -1689,7 +1693,7 @@ pub fn build_apng(builder: APNGBuilder) -> Result<Vec<u8>, String> {
             Err(format!("write error: {fname}"))
         }
         else {
-            Ok(vec![])
+            Ok(())
         }
     }
     else {

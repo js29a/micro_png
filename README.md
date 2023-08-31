@@ -1,6 +1,14 @@
 usage
 =====
 
+project Wiki
+============
+
+<https://github.com/js29a/micro_png/wiki>
+
+at glance
+=========
+
 ```rust
 use micro_png::*;
 

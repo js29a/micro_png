@@ -1,8 +1,8 @@
 use micro_png::*;
 
-fn main() {
+fn from_readme() {
     // load an image
-    let image = read_png("tmp/test.png").expect("can't load test.png");
+    let image = read_png("fixtures/test.png").expect("can't load test.png");
 
     println!("{} x {}", image.width(), image.height());
 
@@ -71,4 +71,25 @@ fn main() {
            .set_def_dur((100, 1000)) // default frame duration: 100 / 1000 [sec]
            .set_dur(1, (500, 1000)) // duration for frame #1: 500 / 1000 [sec]
     ).unwrap();
+}
+
+fn from_wiki_copy() {
+    // 1. load the file
+    let image = read_png("fixtures/test.png").expect("can't load test.png");
+
+    // 2. save it as TrueColor RGBA
+    if let ImageData::RGBA(rgba) = image.raw() {
+        build_apng(APNGBuilder::new("tmp/test-copy.png", ImageData::RGBA(rgba.to_vec()))).unwrap()
+    }
+    else {
+        panic!("sth wrong with fixtures/test.png")
+    }
+
+    // 3. save it as HDR (16 bit component depth)
+    build_apng(APNGBuilder::new("tmp/test-HDR.png", ImageData::RGBA16(vec![image.data()]))).unwrap();
+}
+
+fn main() {
+    from_readme();
+    from_wiki_copy();
 }
