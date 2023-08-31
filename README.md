@@ -100,9 +100,9 @@ supported formats
 | ImageData::GRAY   | k-bit grayscale without alpha       |
 | ImageData::GRAYA  | i-bit grayscale with alpha          |
 
-n: 1, 2, 4, 8
-k: 1, 2, 4, 8, 16
-i: 8, 16
+- n: 1, 2, 4, 8,
+- k: 1, 2, 4, 8, 16,
+- i: 8, 16,
 
 todo
 ====
