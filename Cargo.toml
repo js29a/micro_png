@@ -7,7 +7,7 @@ repository = "https://github.com/js29a/micro_png"
 version = "0.3.2"
 edition = "2021"
 readme = "README.md"
-description = "Low-level minimalist HDR APNG writer (with Adam7) and HDR PNG reader with just a few dependencies (8,16 RGB(A), 1,2,4,8 palette, 1,2,4,8,16 Grayscale)."
+description = "Low-level minimalist APNG writer (with Adam7 option) and PNG reader with just a few dependencies. All possible formats are covered (including HDR)."
 categories = ["multimedia::images"]
 keywords = ["png", "apng", "hdr"]
 

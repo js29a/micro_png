@@ -2274,8 +2274,7 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                 ndx_line = Vec::new();
                 ndx_line_raw = Vec::new();
                 let mut gray_line = Vec::new();
-                //println!("{slice:?}");
-                //let mut ndx_line: Vec<u8> = Vec::new();
+
                 let gray_status = (0 .. line_width).map(|ox| -> Result<(), String> {
                     let x = ox;
                     let ndx = add(slice[ox + 1], png_rev(
@@ -2315,8 +2314,6 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                         },
                         _ => panic!("internal error @ unpack_idat / grayscale")
                     };
-
-                    //println!("{unpacked:?}");
 
                     (0 .. top).for_each(|pos| {
                         if line.len() >= width {
@@ -2677,7 +2674,7 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
 /// ```rust
 /// use micro_png::*;
 ///
-/// let image = read_png("tmp/test.png").expect("can't load test.png");
+/// let image = read_png("fixtures/test.png").expect("can't load test.png");
 ///
 /// println!("{} x {}", image.width(), image.height());
 ///
