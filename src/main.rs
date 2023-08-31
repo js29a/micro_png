@@ -123,8 +123,32 @@ fn from_wiki_truecolor() {
     build_apng(APNGBuilder::new("tmp/test-RGB.png", ImageData::RGB(vec![image_rgb]))).unwrap();
 }
 
+fn from_wiki_animation() {
+    // 1. generate some RGBA animation frames
+    let mut image_rgba: Vec<Vec<Vec<RGBA>>> = vec![vec![vec![(0, 0, 0, 0); 64]; 64]; 16];
+
+    (0 .. 16).for_each(|f| {
+        let a = (f as f32 / 16.0 * std::f32::consts::PI).cos().abs();
+        (0 .. 64).for_each(|y| {
+            (0 .. 64).for_each(|x| {
+                let dy = (32.5 - y as f32) / 32.5;
+                let dx = (32.5 - x as f32) / 32.5;
+                let r = (dx * dx + dy * dy).sqrt();
+                image_rgba[f][y][x].0 = ((x >> 3) << 5) as u8; // blue
+                image_rgba[f][y][x].1 = ((y >> 3) << 5) as u8; // green
+                image_rgba[f][y][x].2 = 0xff; // blue
+                image_rgba[f][y][x].3 = 255 - (a * r * 255.0) as u8; // alpha
+            });
+        });
+    });
+
+    // 2. write it into a file
+    build_apng(APNGBuilder::new("tmp/test-APNG-RGBA.png", ImageData::RGBA(image_rgba))).unwrap();
+}
+
 fn main() {
     from_readme();
     from_wiki_copy();
     from_wiki_truecolor();
+    from_wiki_animation();
 }
