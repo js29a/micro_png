@@ -7,7 +7,7 @@ repository = "https://github.com/js29a/micro_png"
 version = "0.3.4"
 edition = "2021"
 readme = "README.md"
-description = "Low-level minimalist APNG writer (with Adam7 option) and PNG reader with just a few dependencies. All possible formats are covered (including HDR)."
+description = "Low-level minimalist APNG writer and PNG reader with just a few dependencies. All possible formats are covered (including HDR and Adam7)."
 categories = ["multimedia::images"]
 keywords = ["png", "apng", "hdr"]
 

@@ -403,19 +403,6 @@ fn pack_pix(color_type: ColorType, row: &[RGBA16]) -> Vec<RGBA16> {
             });
             res
         },
-        //ColorType::GRAYA(Grayscale::G4) => {
-            //let mut res: Vec<RGBA16> = Vec::new();
-            //(0 .. row.len()).for_each(|ndx| {
-                //res.push((
-                      //((row[ndx    ].0 & 15) << 4)
-                    //| ( row[ndx    ].3 & 15      ),
-                    //0,
-                    //0,
-                    //0
-                //));
-            //});
-            //res
-        //},
         ColorType::GRAY(Grayscale::G4) => {
             assert!((row.len() & 1) == 0);
             let mut res: Vec<RGBA16> = Vec::new();
@@ -430,22 +417,6 @@ fn pack_pix(color_type: ColorType, row: &[RGBA16]) -> Vec<RGBA16> {
             });
             res
         },
-        //ColorType::GRAYA(Grayscale::G2) => {
-            //assert!((row.len() & 1) == 0);
-            //let mut res: Vec<RGBA16> = Vec::new();
-            //(0 .. row.len()).step_by(2).for_each(|ndx| {
-                //res.push((
-                      //((row[ndx    ].0 & 3) << 6)
-                    //| ((row[ndx    ].1 & 3) << 4)
-                    //| ((row[ndx + 1].0 & 3) << 2)
-                    //| ( row[ndx + 1].1 & 3      ),
-                    //0,
-                    //0,
-                    //0
-                //));
-            //});
-            //res
-        //},
         ColorType::GRAY(Grayscale::G2) => {
             assert!((row.len() & 3) == 0);
             let mut res: Vec<RGBA16> = Vec::new();
@@ -462,26 +433,6 @@ fn pack_pix(color_type: ColorType, row: &[RGBA16]) -> Vec<RGBA16> {
             });
             res
         },
-        //ColorType::GRAYA(Grayscale::G1) => {
-            //assert!((row.len() & 3) == 0);
-            //let mut res: Vec<RGBA16> = Vec::new();
-            //(0 .. row.len()).step_by(4).for_each(|ndx| {
-                //res.push((
-                      //((row[ndx    ].0 & 1) << 7)
-                    //| ((row[ndx    ].1 & 1) << 6)
-                    //| ((row[ndx + 1].0 & 1) << 5)
-                    //| ((row[ndx + 1].1 & 1) << 4)
-                    //| ((row[ndx + 2].0 & 1) << 3)
-                    //| ((row[ndx + 2].1 & 1) << 2)
-                    //| ((row[ndx + 3].0 & 1) << 1)
-                    //| ( row[ndx + 3].1 & 1      ),
-                    //0,
-                    //0,
-                    //0
-                //));
-            //});
-            //res
-        //},
         ColorType::GRAY(Grayscale::G1) => {
             assert!((row.len() & 7) == 0);
             let mut res: Vec<RGBA16> = Vec::new();
@@ -512,11 +463,8 @@ fn png_none(row_raw: &[RGBA16], _above: &[RGBA16], color_type: ColorType) -> Vec
     res.push(0_u8);
 
     let row = match color_type {
-        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, row_raw),
@@ -590,11 +538,8 @@ fn png_sub(row_raw: &[RGBA16], _above: &[RGBA16], color_type: ColorType) -> Vec<
     res.push(1_u8);
 
     let row = match color_type {
-        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, row_raw),
@@ -671,11 +616,8 @@ fn png_up(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> Ve
     res.push(2_u8);
 
     let row = match color_type {
-        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, row_raw),
@@ -683,11 +625,8 @@ fn png_up(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> Ve
     };
 
     let above = match color_type {
-        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, above_raw),
@@ -772,13 +711,9 @@ fn png_avg(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> V
 
     res.push(3_u8);
 
-
     let row = match color_type {
-        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, row_raw),
@@ -786,11 +721,8 @@ fn png_avg(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) -> V
     };
 
     let above = match color_type {
-        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, above_raw),
@@ -879,11 +811,8 @@ fn png_paeth(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) ->
     res.push(4_u8);
 
     let row = match color_type {
-        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, row_raw),
@@ -891,11 +820,8 @@ fn png_paeth(row_raw: &[RGBA16], above_raw: &[RGBA16], color_type: ColorType) ->
     };
 
     let above = match color_type {
-        //ColorType::GRAYA(Grayscale::G4) |
         ColorType::GRAY(Grayscale::G4) |
-        //ColorType::GRAYA(Grayscale::G2) |
         ColorType::GRAY(Grayscale::G2) |
-        //ColorType::GRAYA(Grayscale::G1) |
         ColorType::GRAY(Grayscale::G1) |
         ColorType::NDXA(_) | ColorType::NDX(_) =>
             pack_pix(color_type, above_raw),
@@ -1231,10 +1157,10 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
     let mut payload: Vec<u8> = Vec::new();
     let mut above: Vec<RGBA16> = vec![];
 
-    let mut fdat: Vec<u8> = b"fdAT".to_vec(); // vec![b'f', b'd', b'A', b'T'];
+    let mut fdat: Vec<u8> = b"fdAT".to_vec();
 
     if ndx == 0 {
-        fdat = b"IDAT".to_vec(); // vec![b'I', b'D', b'A', b'T'];
+        fdat = b"IDAT".to_vec();
         *seq += 1;
     }
     else {
@@ -1324,13 +1250,11 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
                     }
                 },
                 ColorType::GRAY(Grayscale::G2) => {
-                //ColorType::GRAYA(Grayscale::G1) => {
                     while (line.len() & 3) != 0 {
                         line.push((0, 0, 0, 0))
                     }
                 },
                 ColorType::GRAY(Grayscale::G4) => {
-                //ColorType::GRAYA(Grayscale::G2) => {
                     while (line.len() & 1) != 0 {
                         line.push((0, 0, 0, 0))
                     }
@@ -1450,7 +1374,7 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
 
     res.extend(b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a");
 
-    let mut ihdr: Vec<u8> = b"IHDR".to_vec(); // vec![b'I', b'H', b'D', b'R'];
+    let mut ihdr: Vec<u8> = b"IHDR".to_vec();
 
     let width = frames[0][0].len();
     let height = frames[0].len();
@@ -1517,7 +1441,7 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
     });
 
     if frames.len() > 1 {
-        let mut actl: Vec<u8> = b"acTL".to_vec(); // vec![b'a', b'c', b'T', b'L'];
+        let mut actl: Vec<u8> = b"acTL".to_vec();
 
         actl.extend((frames.len() as u32).to_be_bytes());
         actl.extend(builder.repeat.to_be_bytes());
@@ -1538,7 +1462,7 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
         }
 
         if frames.len() > 1 {
-            let mut fctl: Vec<u8> = b"fcTL".to_vec(); // vec![b'f', b'c', b'T', b'L'];
+            let mut fctl: Vec<u8> = b"fcTL".to_vec();
 
             if ndx > 0 {
                 fctl.extend((seq - 1).to_be_bytes());
@@ -1586,7 +1510,7 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
         ));
     });
 
-    let iend: Vec<u8> = b"IEND".to_vec(); // vec![b'I', b'E', b'N', b'D'];
+    let iend: Vec<u8> = b"IEND".to_vec();
 
     res.extend(png_chunk(&iend));
 
@@ -1748,11 +1672,8 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
         ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) / 8) + 1,
 
         ColorType::GRAY(Grayscale::G1) => (width + 7) / 8 + 1,
-        //ColorType::GRAYA(Grayscale::G1) =>  (width + 3) / 4 + 1,
         ColorType::GRAY(Grayscale::G2) =>  (width + 3) / 4 + 1,
-        //ColorType::GRAYA(Grayscale::G2) =>  (width + 2) / 2 + 1,
         ColorType::GRAY(Grayscale::G4) =>  (width + 1) / 2 + 1,
-        //ColorType::GRAYA(Grayscale::G4) =>  width + 1,
 
         ColorType::GRAY(Grayscale::G8) => width + 1,
         ColorType::GRAYA(Grayscale::G8) => width * 2 + 1,
@@ -1769,8 +1690,6 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
     let mut ndx_above: Vec<u8> = vec![0; width * 4];// XXX for GRAY(A)
     let mut ndx_line: Vec<u8> = Vec::new();
     let mut ndx_line_raw: Vec<u8> = Vec::new();
-    //let mut gray_line: Vec<u16> = Vec::new();
-    //let mut graya_line: Vec<(u16, u16)> = Vec::new();
 
     let status = (0 .. height).map(|y| -> Result<(), String> {
         let offs = match color_type {
@@ -1783,11 +1702,8 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
             ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => ((width + 3) / 4 + 1) * y,
             ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) / 8 + 1) * y,
             ColorType::GRAY(Grayscale::G1) => ((width + 7) / 8 + 1) * y,
-            //ColorType::GRAYA(Grayscale::G1) => ((width + 3) / 4 + 1) * y,
             ColorType::GRAY(Grayscale::G2) => ((width + 3) / 4 + 1) * y,
-            //ColorType::GRAYA(Grayscale::G2) =>  ((width + 1) / 2 + 1) * y,
             ColorType::GRAY(Grayscale::G4) => ((width + 1) / 2 + 1) * y,
-            //ColorType::GRAYA(Grayscale::G4) => (width + 1) * y,
             ColorType::GRAY(Grayscale::G8) => (width + 1) * y,
             ColorType::GRAYA(Grayscale::G8) => (width * 2 + 1) * y,
             ColorType::GRAY(Grayscale::G16) => (width * 2 + 1) * y,
@@ -2364,7 +2280,6 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
                 if let Some(e) = gray_status {
                     return e;
                 }
-                //raw_ndx.push(ndx_line_raw.clone());
                 raw_gray.push(gray_line);
             },
         };
@@ -2441,7 +2356,7 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
     loop {
         let chunk = get_chunk(&buf[offs ..])?;
 
-        offs += chunk.1.len() + 12_usize;// len, crc
+        offs += chunk.1.len() + 12_usize;
 
         if chunk.0 == "IHDR" {
             width = match chunk.1[0 .. 4].try_into() {
@@ -2456,9 +2371,9 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
 
             let depth = chunk.1[8];
             let color = chunk.1[9];
-            let pack = chunk.1[10]; // TODO expect 0
-            let filter = chunk.1[11];// TODO expect 0
-            let ilace = chunk.1[12];// NOTE 1 is Adam7
+            let pack = chunk.1[10]; 
+            let filter = chunk.1[11];
+            let ilace = chunk.1[12];
 
             if color == 3 {
                 match depth {
@@ -2492,9 +2407,6 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                         d => return Err(format!("depth {d} for GRAY not supported"))
                     },
                 4 => match depth {
-                        //1 => color_type = ColorType::GRAYA(Grayscale::G1),
-                        //2 => color_type = ColorType::GRAYA(Grayscale::G2),
-                        //4 => color_type = ColorType::GRAYA(Grayscale::G4),
                         8 => color_type = ColorType::GRAYA(Grayscale::G8),
                         16 => color_type = ColorType::GRAYA(Grayscale::G16),
                         d => return Err(format!("depth {d} for GRAYA not supported"))
@@ -2831,8 +2743,6 @@ pub fn read_png(fname: &str) -> Result<Image, String> {
 mod tests {
     use super::*;
 
-    //const WIDTH: usize = 15;
-    //const HEIGHT: usize = 7;
     const WIDTH: usize = 133;
     const HEIGHT: usize = 193;
 
@@ -3103,7 +3013,6 @@ mod tests {
 
     fn image_gsa(depth: usize) -> (Vec<Vec<RGBA16>>, // restored image
                                    Vec<Vec<(u16, u16)>>) { // data
-        //assert!(depth == 1 || depth == 2 || depth == 4 || depth == 8 || depth == 16);
         assert!(depth == 8 || depth == 16);
 
         let s = 1 << depth;
@@ -3584,13 +3493,6 @@ mod tests {
                 .set_meta("Comment", "test comment")
                 .set_zmeta("Author", "test author")
         ).expect("can't write tmp/meta.png");
-
-        //write_apng("tmp/meta.png",
-            //&ImageData::RGBA(vec![data]), // write one frame
-            //None ,// automatically select filtering
-            //None, // no progress callback
-            //false // no Adam-7
-        //).expect("can't save back.png");
 
         let back = read_png("tmp/meta.png").unwrap();
         let meta = back.meta();
