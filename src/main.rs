@@ -172,10 +172,26 @@ fn from_wiki_u8() {
      assert_eq!(*back.raw(), ImageData::RGBA(vec![orig]));
 }
 
+fn from_wiki_speed() {
+    // 1. create simple image, actual content is not important here
+    let data: Vec<Vec<RGBA>> = vec![
+        vec![(255, 0, 0, 255), (0, 0, 0, 255)],
+        vec![(0, 0, 0, 255), (255, 0, 0, 255)],
+        vec![(0, 255, 0, 255), (255, 255, 0, 255)],
+    ];
+
+    // 2. serialize the image
+    build_apng(
+         APNGBuilder::new("tmp/paeth.png", ImageData::RGBA(vec![data]))
+         .set_filter(Filter::Paeth)
+     ).expect("can't write into u8");
+}
+
 fn main() {
     from_readme();
     from_wiki_copy();
     from_wiki_truecolor();
     from_wiki_animation();
     from_wiki_u8();
+    from_wiki_speed();
 }
