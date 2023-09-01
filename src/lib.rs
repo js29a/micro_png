@@ -3154,14 +3154,13 @@ mod tests {
             ).unwrap();
 
             let back = read_png(&fname).unwrap();
+            let back_7 = read_png(&fname_a7).unwrap();
 
             assert_eq!(back.width, WIDTH);
             assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::RGBA);
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::RGBA(vec![image.clone()]));
-
-            let back_7 = read_png(&fname_a7).unwrap();
 
             assert_eq!(back_7.width, WIDTH);
             assert_eq!(back_7.height, HEIGHT);
@@ -3204,12 +3203,19 @@ mod tests {
             ).unwrap();
 
             let back = read_png(&fname).unwrap();
+            let back_7 = read_png(&fname_a7).unwrap();
 
             assert_eq!(back.width, WIDTH);
             assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::RGBA16);
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::RGBA16(vec![image.clone()]));
+
+            assert_eq!(back_7.width, WIDTH);
+            assert_eq!(back_7.height, HEIGHT);
+            assert_eq!(back_7.color_type, ColorType::RGBA16);
+            assert_eq!(back_7.data, orig);
+            //assert_eq!(back_7.raw, ImageData::RGBA16(vec![image.clone()]));
         });
     }
 
@@ -3246,12 +3252,19 @@ mod tests {
             ).unwrap();
 
             let back = read_png(&fname).unwrap();
+            let back_7 = read_png(&fname_a7).unwrap();
 
             assert_eq!(back.width, WIDTH);
             assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::RGB);
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::RGB(vec![data.clone()]));
+
+            assert_eq!(back_7.width, WIDTH);
+            assert_eq!(back_7.height, HEIGHT);
+            assert_eq!(back_7.color_type, ColorType::RGB);
+            assert_eq!(back_7.data, orig);
+            //assert_eq!(back_7.raw, ImageData::RGB(vec![data.clone()]));
         });
     }
 
@@ -3288,12 +3301,19 @@ mod tests {
             ).unwrap();
 
             let back = read_png(&fname).unwrap();
+            let back_7 = read_png(&fname_a7).unwrap();
 
             assert_eq!(back.width, WIDTH);
             assert_eq!(back.height, HEIGHT);
             assert_eq!(back.color_type, ColorType::RGB16);
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::RGB16(vec![data.clone()]));
+
+            assert_eq!(back_7.width, WIDTH);
+            assert_eq!(back_7.height, HEIGHT);
+            assert_eq!(back_7.color_type, ColorType::RGB16);
+            assert_eq!(back_7.data, orig);
+            //assert_eq!(back_7.raw, ImageData::RGB16(vec![data.clone()]));
         });
     }
 
@@ -3339,12 +3359,19 @@ mod tests {
                 ).unwrap();
 
                 let back = read_png(&fname).unwrap();
+                let back_7 = read_png(&fname_a7).unwrap();
 
                 assert_eq!(back.width, WIDTH);
                 assert_eq!(back.height, HEIGHT);
                 assert_eq!(back.color_type, ColorType::NDX(*pt));
                 assert_eq!(back.data, orig);
                 assert_eq!(back.raw, ImageData::NDX(vec![data.clone()], pal.clone(), *pt));
+
+                assert_eq!(back_7.width, WIDTH);
+                assert_eq!(back_7.height, HEIGHT);
+                assert_eq!(back_7.color_type, ColorType::NDX(*pt));
+                assert_eq!(back_7.data, orig);
+                //assert_eq!(back_7.raw, ImageData::NDX(vec![data.clone()], pal.clone(), *pt));
             });
         });
     }
@@ -3391,12 +3418,19 @@ mod tests {
                 ).unwrap();
 
                 let back = read_png(&fname).unwrap();
+                let back_7 = read_png(&fname_a7).unwrap();
 
                 assert_eq!(back.width, WIDTH);
                 assert_eq!(back.height, HEIGHT);
                 assert_eq!(back.color_type, ColorType::NDXA(*pt));
                 assert_eq!(back.data, orig);
                 assert_eq!(back.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), *pt));
+
+                assert_eq!(back_7.width, WIDTH);
+                assert_eq!(back_7.height, HEIGHT);
+                assert_eq!(back_7.color_type, ColorType::NDXA(*pt));
+                assert_eq!(back_7.data, orig);
+                //assert_eq!(back_7.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), *pt));
             });
         });
     }
@@ -3443,12 +3477,19 @@ mod tests {
                 ).unwrap();
 
                 let back = read_png(&fname).unwrap();
+                let back_7 = read_png(&fname_a7).unwrap();
 
                 assert_eq!(back.width, WIDTH);
                 assert_eq!(back.height, HEIGHT);
                 assert_eq!(back.color_type, ColorType::GRAY(*gt));
                 assert_eq!(back.data, orig);
                 assert_eq!(back.raw, ImageData::GRAY(vec![data.clone()], *gt));
+
+                assert_eq!(back_7.width, WIDTH);
+                assert_eq!(back_7.height, HEIGHT);
+                assert_eq!(back_7.color_type, ColorType::GRAY(*gt));
+                assert_eq!(back_7.data, orig);
+                //assert_eq!(back_7.raw, ImageData::GRAY(vec![data.clone()], *gt));
             });
         });
     }
@@ -3492,12 +3533,19 @@ mod tests {
                 ).unwrap();
 
                 let back = read_png(&fname).unwrap();
+                let back_7 = read_png(&fname_a7).unwrap();
 
                 assert_eq!(back.width, WIDTH);
                 assert_eq!(back.height, HEIGHT);
                 assert_eq!(back.color_type, ColorType::GRAYA(*gt));
                 assert_eq!(back.data, orig);
                 assert_eq!(back.raw, ImageData::GRAYA(vec![data.clone()], *gt));
+
+                assert_eq!(back_7.width, WIDTH);
+                assert_eq!(back_7.height, HEIGHT);
+                assert_eq!(back_7.color_type, ColorType::GRAYA(*gt));
+                assert_eq!(back_7.data, orig);
+                //assert_eq!(back_7.raw, ImageData::GRAYA(vec![data.clone()], *gt));
             });
         });
     }
