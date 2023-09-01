@@ -1723,7 +1723,10 @@ fn get_chunk(inp: &[u8]) -> Result<(String, &[u8]), String> {
     Ok((code, &inp[8 .. 8 + length]))
 }
 
-fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, pal: &[RGBA]) -> Result<(Vec<Vec<RGBA16>>, ImageData, Vec<u8>), String> {
+type IdatResult = (Vec<Vec<RGBA16>>, ImageData, Vec<u8>);
+
+fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, pal: &[RGBA])
+    -> Result<IdatResult, String> {
     let mut res: Vec<Vec<RGBA16>> = Vec::new();
 
     let mut raw_rgba16: Vec<Vec<RGBA16>> = Vec::new();
@@ -2548,16 +2551,14 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
 
                 let (d, r, rest) = unpack_idat(width, height, &unpacked[..], color_type, &pal)?;
 
-                if rest.len() > 0 {
+                if !rest.is_empty() {
                     return Err("IDAT buffer overflow".to_string())
                 }
 
                 data = d;
                 raw = Some(r);
             }
-            else {
-                // Adam7
-
+            else { // Adam7
                 let mut d = vec![vec![(0, 0, 0, 0); width]; height];
                 let lo = 1;
                 let hi = 7;
@@ -2668,6 +2669,10 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                     ColorType::GRAY(g) => ImageData::GRAY(vec![data_gs], g),
                     ColorType::GRAYA(g) => ImageData::GRAYA(vec![data_gsa], g),
                 });
+
+                if !cur.is_empty() {
+                    return Err("IDAT buffer overflow".to_string())
+                }
             }
         }
 
