@@ -1,3 +1,9 @@
+## 0.3.4 (2023-09-01T07:10:43)
+  - compatibility with older vers of Rust
+
+## 0.3.4 (2023-09-01T07:09:06)
+  - README.md
+
 ## 0.3.3 (2023-08-31T18:00:22)
   - build_apng signature bugfix,
   - README.md: link to project Wiki
