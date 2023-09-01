@@ -1787,6 +1787,11 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
             ColorType::GRAYA(Grayscale::G16) => (width * 4 + 1) * y,
             _ => panic!("how???")
         };
+
+        if offs + slice_len > raw.len() {
+            return Err("unpack_idat: buffer too short".to_string())
+        }
+
         let slice = &raw[offs .. offs + slice_len];
         let mode = slice[0];
         let mut line: Vec<RGBA16> = Vec::new();
@@ -2424,6 +2429,8 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
 
     let mut ps = 0xff_usize;
 
+    let mut adam_7 = false;
+
     loop {
         let chunk = get_chunk(&buf[offs ..])?;
 
@@ -2496,8 +2503,11 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                 return Err(format!("unsupported filter {filter}"));
             }
 
-            if ilace != 0 {
-                return Err("Adam7 not supported".to_string());
+            if ilace != 0 && ilace != 1 {
+                return Err("bad interlacing mode".to_string())
+            }
+            else {
+                adam_7 = ilace == 1;
             }
         }
 
@@ -2505,44 +2515,121 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
             let mut deco = ZlibDecoder::new(&unpacked[..]);
             let mut unpacked: Vec<u8> = Vec::new();
 
-            let exp = match color_type {
-                ColorType::RGBA16 => (width * 4 * 2 + 1) * height,
-                ColorType::RGB16 => (width * 3 * 2 + 1) * height,
-                ColorType::RGBA => (width * 4 + 1) * height,
-                ColorType::RGB => (width * 3 + 1) * height,
-                ColorType::NDXA(Palette::P8) | ColorType::NDX(Palette::P8) => (width + 1) * height,
-                ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => ((width + 1) / 2 + 1) * height,
-                ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => ((width + 3) / 4 + 1) * height,
-                ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) / 8 + 1) * height,
-                ColorType::GRAYA(Grayscale::G8) => (width * 2 + 1) * height,
-                ColorType::GRAY(Grayscale::G8) => (width + 1) * height,
-                ColorType::GRAYA(Grayscale::G16) => (width * 4 + 1) * height,
-                ColorType::GRAY(Grayscale::G16) => (width * 2 + 1) * height,
-                //ColorType::GRAYA(Grayscale::G4) => (width + 1) * height,
-                ColorType::GRAY(Grayscale::G4) => ((width + 1) / 2 + 1) * height,
-                //ColorType::GRAYA(Grayscale::G2) => ((width + 1) / 2 + 1) * height,
-                ColorType::GRAY(Grayscale::G2) => ((width + 3) / 4 + 1) * height,
-                //ColorType::GRAYA(Grayscale::G1) => ((width + 3) / 4 + 1) * height,
-                ColorType::GRAY(Grayscale::G1) => ((width + 7) / 8 + 1) * height,
-                _ => panic!("how???")
-            };
-
             if let Err(e) = deco.read_to_end(&mut unpacked) {
                 return Err(format!("zlib IDAT: {e:?}"))
             }
 
-            if unpacked.len() != exp {
-                return Err(format!("compression error: exp {exp} got {}", unpacked.len()))
+            if !adam_7 {
+                let exp = match color_type {
+                    ColorType::RGBA16 => (width * 4 * 2 + 1) * height,
+                    ColorType::RGB16 => (width * 3 * 2 + 1) * height,
+                    ColorType::RGBA => (width * 4 + 1) * height,
+                    ColorType::RGB => (width * 3 + 1) * height,
+                    ColorType::NDXA(Palette::P8) | ColorType::NDX(Palette::P8) => (width + 1) * height,
+                    ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => ((width + 1) / 2 + 1) * height,
+                    ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => ((width + 3) / 4 + 1) * height,
+                    ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) / 8 + 1) * height,
+                    ColorType::GRAYA(Grayscale::G8) => (width * 2 + 1) * height,
+                    ColorType::GRAY(Grayscale::G8) => (width + 1) * height,
+                    ColorType::GRAYA(Grayscale::G16) => (width * 4 + 1) * height,
+                    ColorType::GRAY(Grayscale::G16) => (width * 2 + 1) * height,
+                    //ColorType::GRAYA(Grayscale::G4) => (width + 1) * height,
+                    ColorType::GRAY(Grayscale::G4) => ((width + 1) / 2 + 1) * height,
+                    //ColorType::GRAYA(Grayscale::G2) => ((width + 1) / 2 + 1) * height,
+                    ColorType::GRAY(Grayscale::G2) => ((width + 3) / 4 + 1) * height,
+                    //ColorType::GRAYA(Grayscale::G1) => ((width + 3) / 4 + 1) * height,
+                    ColorType::GRAY(Grayscale::G1) => ((width + 7) / 8 + 1) * height,
+                    _ => panic!("how???")
+                };
+
+                if unpacked.len() != exp {
+                    return Err(format!("compression error: exp {exp} got {}", unpacked.len()))
+                }
+
+                let (d, r, rest) = unpack_idat(width, height, &unpacked[..], color_type, &pal)?;
+
+                if rest.len() > 0 {
+                    return Err("IDAT buffer overflow".to_string())
+                }
+
+                data = d;
+                raw = Some(r);
             }
+            else {
+                // Adam7
 
-            let (d, r, rest) = unpack_idat(width, height, &unpacked[..], color_type, &pal)?;
+                let mut d = vec![vec![(0, 0, 0, 0); width]; height];
+                let lo = 1;
+                let hi = 7;
+                let mut cur: Vec<u8> = unpacked;
 
-            if rest.len() > 0 {
-                return Err("IDAT buffer overflow".to_string())
+                let mut map: Vec<Vec<usize>> = vec![vec![0_usize; width]; height];
+                let mut slices = vec![0_usize; 8];
+
+                (0 .. height).for_each(|y| {
+                    (0 .. width).for_each(|x| {
+                        let ax = x & 7;
+                        let ay = y & 7;
+                        map[y][x] = ADAM_7[ay * 8 + ax];
+                        slices[ADAM_7[ay * 8 + ax] - 1] += 1;
+                    });
+                });
+
+                let mut a = lo;
+
+                while a <= hi {// TODO .map + result grep
+                    let mut w = 0;
+                    let mut h = 0;
+
+                    (0 .. height).for_each(|y| {
+                        let mut cur_w = 0;
+                        (0 .. width).for_each(|x| {
+                            if map[y][x] == a {
+                                cur_w += 1;
+                            }
+                        });
+                        assert!(cur_w == 0 || w == 0 || cur_w == w);
+                        if cur_w > 0 {
+                            w = cur_w;
+                            h += 1;
+                        }
+                    });
+
+                    if slices[a - 1] > 0 {// NOTE edge case
+                        let (ds, r, rest) = unpack_idat(w, h, &cur[..], color_type, &pal)?;
+                        cur = rest;
+
+                        let mut sy = 0;
+                        let mut sx = 0;
+
+                        (0 .. height).for_each(|y| {
+                            sx = 0;
+                            let mut any = false;
+                            (0 .. width).for_each(|x| {
+                                if map[y][x] == a {
+                                    d[y][x] = ds[sy][sx];
+                                    sx += 1;
+                                    any = true;
+                                }
+                            });
+                            if any {
+                                sy += 1;
+                            }
+                        });
+                    }
+
+                    a += 1;
+                }
+
+                data = d;
+
+                raw = Some(ImageData::RGBA(vec![vec![vec![]]]));
+
+                // TODO as Err
+                //assert_eq!(cur.len(), 0);
+
+                //panic!("here");
             }
-
-            data = d;
-            raw = Some(r);
         }
 
         if chunk.0 == "IDAT" {
@@ -3073,6 +3160,14 @@ mod tests {
             assert_eq!(back.color_type, ColorType::RGBA);
             assert_eq!(back.data, orig);
             assert_eq!(back.raw, ImageData::RGBA(vec![image.clone()]));
+
+            let back_7 = read_png(&fname_a7).unwrap();
+
+            assert_eq!(back_7.width, WIDTH);
+            assert_eq!(back_7.height, HEIGHT);
+            assert_eq!(back_7.color_type, ColorType::RGBA);
+            assert_eq!(back_7.data, orig);
+            //assert_eq!(back_7.raw, ImageData::RGBA(vec![image.clone()]));
         });
     }
 
