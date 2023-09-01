@@ -2577,6 +2577,23 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
 
                 let mut a = lo;
 
+                let mut data_rgba: Vec<Vec<RGBA>> = Vec::new();
+                let mut data_rgb: Vec<Vec<RGB>> = Vec::new();
+
+                let mut data_rgba16: Vec<Vec<RGBA16>> = Vec::new();
+                let mut data_rgb16: Vec<Vec<RGB16>> = Vec::new();
+
+                let mut data_ndx: Vec<Vec<NDX>> = Vec::new();
+
+                match color_type {
+                    ColorType::RGBA => data_rgba = vec![vec![(0, 0, 0, 0); width]; height],
+                    ColorType::RGB => data_rgb = vec![vec![(0, 0, 0); width]; height],
+                    ColorType::RGBA16 => data_rgba16 = vec![vec![(0, 0, 0, 0); width]; height],
+                    ColorType::RGB16 => data_rgb16 = vec![vec![(0, 0, 0); width]; height],
+                    ColorType::NDXA(_) | ColorType::NDX(_) => data_ndx = vec![vec![0; width]; height],
+                    _ => ()
+                };
+
                 while a <= hi {// TODO .map + result grep
                     let mut w = 0;
                     let mut h = 0;
@@ -2608,6 +2625,17 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                             (0 .. width).for_each(|x| {
                                 if map[y][x] == a {
                                     d[y][x] = ds[sy][sx];
+
+                                    match &r {
+                                        ImageData::RGBA(rd) => data_rgba[y][x] = rd[0][sy][sx],
+                                        ImageData::RGB(rd) => data_rgb[y][x] = rd[0][sy][sx],
+                                        ImageData::RGBA16(rd) => data_rgba16[y][x] = rd[0][sy][sx],
+                                        ImageData::RGB16(rd) => data_rgb16[y][x] = rd[0][sy][sx],
+                                        ImageData::NDXA(rd, _, _) => data_ndx[y][x] = rd[0][sy][sx],
+                                        ImageData::NDX(rd, _, _) => data_ndx[y][x] = rd[0][sy][sx],
+                                        _ => ()
+                                    };
+
                                     sx += 1;
                                     any = true;
                                 }
@@ -2623,12 +2651,17 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
 
                 data = d;
 
-                raw = Some(ImageData::RGBA(vec![vec![vec![]]]));
-
-                // TODO as Err
-                //assert_eq!(cur.len(), 0);
-
-                //panic!("here");
+                raw = Some(match color_type {
+                    ColorType::RGBA => ImageData::RGBA(vec![data_rgba]),
+                    ColorType::RGB => ImageData::RGB(vec![data_rgb]),
+                    ColorType::RGBA16 => ImageData::RGBA16(vec![data_rgba16]),
+                    ColorType::RGB16 => ImageData::RGB16(vec![data_rgb16]),
+                    ColorType::NDX(n) => ImageData::NDX(vec![data_ndx], pal.iter().map(|c| {
+                        (c.0, c.1, c.2)
+                    }).collect(), n),
+                    ColorType::NDXA(n) => ImageData::NDXA(vec![data_ndx], pal.clone(), n),
+                    _ => ImageData::RGBA(vec![vec![vec![]]])
+                });
             }
         }
 
@@ -3166,7 +3199,7 @@ mod tests {
             assert_eq!(back_7.height, HEIGHT);
             assert_eq!(back_7.color_type, ColorType::RGBA);
             assert_eq!(back_7.data, orig);
-            //assert_eq!(back_7.raw, ImageData::RGBA(vec![image.clone()]));
+            assert_eq!(back_7.raw, ImageData::RGBA(vec![image.clone()]));
         });
     }
 
@@ -3215,7 +3248,7 @@ mod tests {
             assert_eq!(back_7.height, HEIGHT);
             assert_eq!(back_7.color_type, ColorType::RGBA16);
             assert_eq!(back_7.data, orig);
-            //assert_eq!(back_7.raw, ImageData::RGBA16(vec![image.clone()]));
+            assert_eq!(back_7.raw, ImageData::RGBA16(vec![image.clone()]));
         });
     }
 
@@ -3264,7 +3297,7 @@ mod tests {
             assert_eq!(back_7.height, HEIGHT);
             assert_eq!(back_7.color_type, ColorType::RGB);
             assert_eq!(back_7.data, orig);
-            //assert_eq!(back_7.raw, ImageData::RGB(vec![data.clone()]));
+            assert_eq!(back_7.raw, ImageData::RGB(vec![data.clone()]));
         });
     }
 
@@ -3313,7 +3346,7 @@ mod tests {
             assert_eq!(back_7.height, HEIGHT);
             assert_eq!(back_7.color_type, ColorType::RGB16);
             assert_eq!(back_7.data, orig);
-            //assert_eq!(back_7.raw, ImageData::RGB16(vec![data.clone()]));
+            assert_eq!(back_7.raw, ImageData::RGB16(vec![data.clone()]));
         });
     }
 
@@ -3371,7 +3404,7 @@ mod tests {
                 assert_eq!(back_7.height, HEIGHT);
                 assert_eq!(back_7.color_type, ColorType::NDX(*pt));
                 assert_eq!(back_7.data, orig);
-                //assert_eq!(back_7.raw, ImageData::NDX(vec![data.clone()], pal.clone(), *pt));
+                assert_eq!(back_7.raw, ImageData::NDX(vec![data.clone()], pal.clone(), *pt));
             });
         });
     }
@@ -3430,7 +3463,7 @@ mod tests {
                 assert_eq!(back_7.height, HEIGHT);
                 assert_eq!(back_7.color_type, ColorType::NDXA(*pt));
                 assert_eq!(back_7.data, orig);
-                //assert_eq!(back_7.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), *pt));
+                assert_eq!(back_7.raw, ImageData::NDXA(vec![data.clone()], pal.clone(), *pt));
             });
         });
     }
@@ -3489,7 +3522,7 @@ mod tests {
                 assert_eq!(back_7.height, HEIGHT);
                 assert_eq!(back_7.color_type, ColorType::GRAY(*gt));
                 assert_eq!(back_7.data, orig);
-                //assert_eq!(back_7.raw, ImageData::GRAY(vec![data.clone()], *gt));
+                assert_eq!(back_7.raw, ImageData::GRAY(vec![data.clone()], *gt));
             });
         });
     }
@@ -3545,7 +3578,7 @@ mod tests {
                 assert_eq!(back_7.height, HEIGHT);
                 assert_eq!(back_7.color_type, ColorType::GRAYA(*gt));
                 assert_eq!(back_7.data, orig);
-                //assert_eq!(back_7.raw, ImageData::GRAYA(vec![data.clone()], *gt));
+                assert_eq!(back_7.raw, ImageData::GRAYA(vec![data.clone()], *gt));
             });
         });
     }
