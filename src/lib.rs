@@ -211,7 +211,7 @@ impl Image {
 ///
 ///    // builder variable is not accessible here
 /// ```
-#[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct APNGBuilder {
     fname: String,
     image_data: ImageData,
