@@ -2371,7 +2371,7 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
 
             let depth = chunk.1[8];
             let color = chunk.1[9];
-            let pack = chunk.1[10]; 
+            let pack = chunk.1[10];
             let filter = chunk.1[11];
             let ilace = chunk.1[12];
 
@@ -2396,7 +2396,7 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                         2 => color_type = ColorType::NDX(Palette::P2),
                         4 => color_type = ColorType::NDX(Palette::P4),
                         8 => color_type = ColorType::NDX(Palette::P8),
-                        _ => panic!("color depth detection error"),
+                        d => Err(format!("bad palette depth: {d}")),
                     },
                 0 => match depth {
                         1 => color_type = ColorType::GRAY(Grayscale::G1),
