@@ -1644,6 +1644,10 @@ fn get_chunk(inp: &[u8]) -> Result<(String, &[u8]), String> {
         return Err("bad crc".to_string())
     }
 
+    if 8 + length > inp.len() {
+        return Err("chunk underflow".to_string())
+    }
+
     Ok((code, &inp[8 .. 8 + length]))
 }
 
@@ -2396,7 +2400,7 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                         2 => color_type = ColorType::NDX(Palette::P2),
                         4 => color_type = ColorType::NDX(Palette::P4),
                         8 => color_type = ColorType::NDX(Palette::P8),
-                        d => Err(format!("bad palette depth: {d}")),
+                        d => return Err(format!("bad palette depth: {d}"))
                     },
                 0 => match depth {
                         1 => color_type = ColorType::GRAY(Grayscale::G1),
