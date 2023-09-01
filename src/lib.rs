@@ -1723,7 +1723,7 @@ fn get_chunk(inp: &[u8]) -> Result<(String, &[u8]), String> {
     Ok((code, &inp[8 .. 8 + length]))
 }
 
-fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, pal: &[RGBA]) -> Result<(Vec<Vec<RGBA16>>, ImageData), String> {
+fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, pal: &[RGBA]) -> Result<(Vec<Vec<RGBA16>>, ImageData, Vec<u8>), String> {
     let mut res: Vec<Vec<RGBA16>> = Vec::new();
 
     let mut raw_rgba16: Vec<Vec<RGBA16>> = Vec::new();
@@ -2385,10 +2385,16 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
         ColorType::GRAY(g) => ImageData::GRAY(vec![raw_gray], g),
     };
 
+    let rem = slice_len * height;
+
+    assert!(rem <= raw.len());// XXX sth strange
+
+    let rest = raw[rem ..].to_vec();
+
     match status {
         Some(Err(e)) => Err(e),
         Some(Ok(_)) => Err("internal unpack_idat error".to_string()),
-        None => Ok((res, raw_data))
+        None => Ok((res, raw_data, rest))
     }
 }
 
@@ -2529,7 +2535,11 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                 return Err(format!("compression error: exp {exp} got {}", unpacked.len()))
             }
 
-            let (d, r) = unpack_idat(width, height, &unpacked[..], color_type, &pal)?;
+            let (d, r, rest) = unpack_idat(width, height, &unpacked[..], color_type, &pal)?;
+
+            if rest.len() > 0 {
+                return Err("IDAT buffer overflow".to_string())
+            }
 
             data = d;
             raw = Some(r);
