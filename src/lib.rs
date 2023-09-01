@@ -2628,9 +2628,6 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
             }, String::from_utf8(unpacked).unwrap());
         }
 
-        if chunk.0 == "zTXt" {
-        }
-
         if chunk.0 == "IEND" {
             break
         }
