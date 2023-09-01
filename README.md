@@ -104,6 +104,5 @@ supported formats
 todo
 ====
 
-- Adam-7 input,
 - APNG input,
 
