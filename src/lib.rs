@@ -1761,6 +1761,10 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
         _ => panic!("how???")
     };
 
+    if slice_len * height > raw.len() {
+        return Err("unpack_idat underflow".to_string())
+    }
+
     let mut above: Vec<RGBA16> = vec![(0, 0, 0, 0); width];
     let mut ndx_above: Vec<u8> = vec![0; width * 4];// XXX for GRAY(A)
     let mut ndx_line: Vec<u8> = Vec::new();
@@ -2523,32 +2527,6 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
             }
 
             if !adam_7 {
-                let exp = match color_type {
-                    ColorType::RGBA16 => (width * 4 * 2 + 1) * height,
-                    ColorType::RGB16 => (width * 3 * 2 + 1) * height,
-                    ColorType::RGBA => (width * 4 + 1) * height,
-                    ColorType::RGB => (width * 3 + 1) * height,
-                    ColorType::NDXA(Palette::P8) | ColorType::NDX(Palette::P8) => (width + 1) * height,
-                    ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => ((width + 1) / 2 + 1) * height,
-                    ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => ((width + 3) / 4 + 1) * height,
-                    ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) / 8 + 1) * height,
-                    ColorType::GRAYA(Grayscale::G8) => (width * 2 + 1) * height,
-                    ColorType::GRAY(Grayscale::G8) => (width + 1) * height,
-                    ColorType::GRAYA(Grayscale::G16) => (width * 4 + 1) * height,
-                    ColorType::GRAY(Grayscale::G16) => (width * 2 + 1) * height,
-                    //ColorType::GRAYA(Grayscale::G4) => (width + 1) * height,
-                    ColorType::GRAY(Grayscale::G4) => ((width + 1) / 2 + 1) * height,
-                    //ColorType::GRAYA(Grayscale::G2) => ((width + 1) / 2 + 1) * height,
-                    ColorType::GRAY(Grayscale::G2) => ((width + 3) / 4 + 1) * height,
-                    //ColorType::GRAYA(Grayscale::G1) => ((width + 3) / 4 + 1) * height,
-                    ColorType::GRAY(Grayscale::G1) => ((width + 7) / 8 + 1) * height,
-                    _ => panic!("how???")
-                };
-
-                if unpacked.len() != exp {
-                    return Err(format!("compression error: exp {exp} got {}", unpacked.len()))
-                }
-
                 let (d, r, rest) = unpack_idat(width, height, &unpacked[..], color_type, &pal)?;
 
                 if !rest.is_empty() {
