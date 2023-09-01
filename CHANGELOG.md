@@ -1,3 +1,6 @@
+## 0.3.4 (2023-09-01T07:10:43)
+  - compatibility with older vers of Rust
+
 ## 0.3.4 (2023-09-01T07:09:06)
   - README.md
 
