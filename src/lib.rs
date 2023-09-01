@@ -2585,13 +2585,17 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
 
                 let mut data_ndx: Vec<Vec<NDX>> = Vec::new();
 
+                let mut data_gs: Vec<Vec<u16>> = Vec::new();
+                let mut data_gsa: Vec<Vec<(u16, u16)>> = Vec::new();
+
                 match color_type {
                     ColorType::RGBA => data_rgba = vec![vec![(0, 0, 0, 0); width]; height],
                     ColorType::RGB => data_rgb = vec![vec![(0, 0, 0); width]; height],
                     ColorType::RGBA16 => data_rgba16 = vec![vec![(0, 0, 0, 0); width]; height],
                     ColorType::RGB16 => data_rgb16 = vec![vec![(0, 0, 0); width]; height],
                     ColorType::NDXA(_) | ColorType::NDX(_) => data_ndx = vec![vec![0; width]; height],
-                    _ => ()
+                    ColorType::GRAY(_) => data_gs = vec![vec![0; width]; height],
+                    ColorType::GRAYA(_) => data_gsa = vec![vec![(0, 0); width]; height],
                 };
 
                 while a <= hi {// TODO .map + result grep
@@ -2633,7 +2637,8 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                                         ImageData::RGB16(rd) => data_rgb16[y][x] = rd[0][sy][sx],
                                         ImageData::NDXA(rd, _, _) => data_ndx[y][x] = rd[0][sy][sx],
                                         ImageData::NDX(rd, _, _) => data_ndx[y][x] = rd[0][sy][sx],
-                                        _ => ()
+                                        ImageData::GRAY(rd, _) => data_gs[y][x] = rd[0][sy][sx],
+                                        ImageData::GRAYA(rd, _) => data_gsa[y][x] = rd[0][sy][sx],
                                     };
 
                                     sx += 1;
@@ -2656,11 +2661,12 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                     ColorType::RGB => ImageData::RGB(vec![data_rgb]),
                     ColorType::RGBA16 => ImageData::RGBA16(vec![data_rgba16]),
                     ColorType::RGB16 => ImageData::RGB16(vec![data_rgb16]),
-                    ColorType::NDX(n) => ImageData::NDX(vec![data_ndx], pal.iter().map(|c| {
+                    ColorType::NDX(d) => ImageData::NDX(vec![data_ndx], pal.iter().map(|c| {
                         (c.0, c.1, c.2)
-                    }).collect(), n),
-                    ColorType::NDXA(n) => ImageData::NDXA(vec![data_ndx], pal.clone(), n),
-                    _ => ImageData::RGBA(vec![vec![vec![]]])
+                    }).collect(), d),
+                    ColorType::NDXA(d) => ImageData::NDXA(vec![data_ndx], pal.clone(), d),
+                    ColorType::GRAY(g) => ImageData::GRAY(vec![data_gs], g),
+                    ColorType::GRAYA(g) => ImageData::GRAYA(vec![data_gsa], g),
                 });
             }
         }
