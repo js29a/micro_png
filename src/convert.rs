@@ -12,7 +12,7 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale)
             line.iter().map(|(r, g, b, a)| {
                 let y = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
                 (
-                    (y * ((1 << (bits - 1)) as f32)) as u16,
+                    ((y * ((1 << bits) as f32)) as u32).clamp(0, 1 << bits) as u16,
                     *a / ( if bits == 8  { 256 } else { 1 })
                 )
             }).collect()
@@ -24,7 +24,7 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale)
         let res = orig.iter().map(|line| {
             line.iter().map(|(r, g, b, _a)| {
                 let y = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
-                (y * ((1 << (bits - 1)) as f32)) as u16
+                ((y * ((1 << bits) as f32)) as u32).clamp(0, 1 << bits) as u16
             }).collect()
         }).collect();
 
