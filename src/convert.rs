@@ -33,44 +33,64 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale)
 }
 
 // c -> component #, 0 .. 2
-fn elect_qtz(orig: &Vec<Vec<RGBA16>>, r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize) -> u16 {
+fn elect_qtz(orig: &Vec<Vec<RGBA16>>, r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize,
+    cnt: (&[u64], &[u64], &[u64])) -> u16 {
     assert!(c < 3);
 
     let width = orig[0].len();
     let height = orig.len();
 
-    let mut avg: u64 = 0;
-    let mut cnt: u64 = 0;
+    let mut num: u64 = 0;
+    let mut den: u64 = 0;
 
-    (0 .. height).for_each(|y| {
-        (0 .. width).for_each(|x| {
-            let pix = orig[y][x];
+    match c {
+        0 =>
+            (r.0 ..= r.1).for_each(|p| {
+                num += p as u64 * cnt.0[p as usize] as u64;
+                den += cnt.0[p as usize] as u64;
+            }),
+        1 =>
+            (g.0 ..= g.1).for_each(|p| {
+                num += p as u64 * cnt.1[p as usize] as u64;
+                den += cnt.1[p as usize] as u64;
+            }),
+        2 =>
+            (b.0 ..= b.1).for_each(|p| {
+                num += p as u64 * cnt.2[p as usize] as u64;
+                den += cnt.2[p as usize] as u64;
+            }),
+        _ => panic!("bad call of elect_qtz")
+    };
 
-            match c {
-                0 => {
-                    if pix.0 >= r.0 && pix.0 <= r.1 {
-                        cnt += 1;
-                        avg += pix.0 as u64;
-                    }
-                },
-                1 => {
-                    if pix.1 >= g.0 && pix.1 <= g.1 {
-                        cnt += 1;
-                        avg += pix.1 as u64;
-                    }
-                },
-                2 => {
-                    if pix.2 >= b.0 && pix.2 <= b.1 {
-                        cnt += 1;
-                        avg += pix.2 as u64;
-                    }
-                },
-                _ => panic!("bad call of elect_qtz")
-            }
-        })
-    });
+    //(0 .. height).for_each(|y| {
+        //(0 .. width).for_each(|x| {
+            //let pix = orig[y][x];
 
-    if cnt == 0 {
+            //match c {
+                //0 => {
+                    //if pix.0 >= r.0 && pix.0 <= r.1 {
+                        //cnt += 1;
+                        //avg += pix.0 as u64;
+                    //}
+                //},
+                //1 => {
+                    //if pix.1 >= g.0 && pix.1 <= g.1 {
+                        //cnt += 1;
+                        //avg += pix.1 as u64;
+                    //}
+                //},
+                //2 => {
+                    //if pix.2 >= b.0 && pix.2 <= b.1 {
+                        //cnt += 1;
+                        //avg += pix.2 as u64;
+                    //}
+                //},
+                //_ => panic!("bad call of elect_qtz")
+            //}
+        //})
+    //});
+
+    if den == 0 {
         match c {
             0 => ((r.0 as u32 + r.1 as u32) >> 1) as u16,
             1 => ((g.0 as u32 + g.1 as u32) >> 1) as u16,
@@ -79,7 +99,7 @@ fn elect_qtz(orig: &Vec<Vec<RGBA16>>, r: (u16, u16), g: (u16, u16), b: (u16, u16
         }
     }
     else {
-        (avg / cnt) as u16
+        (num / den) as u16
     }
 
     //let mut vec: Vec<u16> = Vec::new();
@@ -121,7 +141,7 @@ fn elect_qtz(orig: &Vec<Vec<RGBA16>>, r: (u16, u16), g: (u16, u16), b: (u16, u16
     //}
 }
 
-fn elect_palette_sub(orig: &Vec<Vec<RGBA16>>, mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), bits: usize, c: usize, pal: &mut Vec<RGBA>) {
+fn elect_palette_sub(orig: &Vec<Vec<RGBA16>>, r: (u16, u16), g: (u16, u16), b: (u16, u16), bits: usize, c: usize, pal: &mut Vec<RGBA>, cnt: (&[u64], &[u64], &[u64])) {
     assert!(c < 3);
 
     if bits == 0 {
@@ -145,9 +165,9 @@ fn elect_palette_sub(orig: &Vec<Vec<RGBA16>>, mut r: (u16, u16), mut g: (u16, u1
             //});
         //});
 
-        let q_0 = elect_qtz(orig, r, g, b, 0);
-        let q_1 = elect_qtz(orig, r, g, b, 1);
-        let q_2 = elect_qtz(orig, r, g, b, 2);
+        let q_0 = elect_qtz(orig, r, g, b, 0, cnt);
+        let q_1 = elect_qtz(orig, r, g, b, 1, cnt);
+        let q_2 = elect_qtz(orig, r, g, b, 2, cnt);
 
         //let q_0 = (r.0 as u32 + r.1 as u32) >> 1;
         //let q_1 = (g.0 as u32 + g.1 as u32) >> 1;
@@ -161,20 +181,20 @@ fn elect_palette_sub(orig: &Vec<Vec<RGBA16>>, mut r: (u16, u16), mut g: (u16, u1
         ));
     }
     else {
-        let split = elect_qtz(orig, r, g, b, c);
+        let split = elect_qtz(orig, r, g, b, c, cnt);
 
         match c {
             0 => {
-                elect_palette_sub(orig, (r.0, split), g, b, bits - 1, (c + 1) % 3, pal);
-                elect_palette_sub(orig, (split, r.1), g, b, bits - 1, (c + 1) % 3, pal);
+                elect_palette_sub(orig, (r.0, split), g, b, bits - 1, (c + 1) % 3, pal, cnt);
+                elect_palette_sub(orig, (split, r.1), g, b, bits - 1, (c + 1) % 3, pal, cnt);
             },
             1 => {
-                elect_palette_sub(orig, r, (g.0, split), b, bits - 1, (c + 1) % 3, pal);
-                elect_palette_sub(orig, r, (split, g.1), b, bits - 1, (c + 1) % 3, pal);
+                elect_palette_sub(orig, r, (g.0, split), b, bits - 1, (c + 1) % 3, pal, cnt);
+                elect_palette_sub(orig, r, (split, g.1), b, bits - 1, (c + 1) % 3, pal, cnt);
             },
             2 => {
-                elect_palette_sub(orig, r, g, (b.0, split), bits - 1, (c + 1) % 3, pal);
-                elect_palette_sub(orig, r, g, (split, b.1), bits - 1, (c + 1) % 3, pal);
+                elect_palette_sub(orig, r, g, (b.0, split), bits - 1, (c + 1) % 3, pal, cnt);
+                elect_palette_sub(orig, r, g, (split, b.1), bits - 1, (c + 1) % 3, pal, cnt);
             },
             _ => panic!("internal elect_palette_sub error")
         }
@@ -184,7 +204,24 @@ fn elect_palette_sub(orig: &Vec<Vec<RGBA16>>, mut r: (u16, u16), mut g: (u16, u1
 fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
     let mut pal: Vec<RGBA> = Vec::new();
 
-    elect_palette_sub(orig, (0, 0xffff), (0, 0xffff), (0, 0xffff), bits, 0, &mut pal);
+    let width = orig[0].len();
+    let height = orig.len();
+
+    let mut cnt_a = vec![0_u64; 0xffff + 1];
+    let mut cnt_g = vec![0_u64; 0xffff + 1];
+    let mut cnt_b = vec![0_u64; 0xffff + 1];
+
+    (0 .. height).for_each(|y| {
+        (0 .. width).for_each(|x| {
+            let pix = orig[y][x];
+            cnt_a[pix.0 as usize] += 1;
+            cnt_g[pix.1 as usize] += 1;
+            cnt_b[pix.2 as usize] += 1;
+        });
+    });
+
+    elect_palette_sub(orig, (0, 0xffff), (0, 0xffff), (0, 0xffff), bits, 0, &mut pal,
+        (&cnt_a[..], &cnt_g[..], &cnt_b[..]));
     assert_eq!(pal.len(), 1 << bits);
     pal
 }
