@@ -33,12 +33,9 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale)
 }
 
 // c -> component #, 0 .. 2
-fn elect_qtz(orig: &Vec<Vec<RGBA16>>, r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize,
+fn elect_qtz(_orig: &[Vec<RGBA16>], r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize,
     cnt: (&[u64], &[u64], &[u64])) -> u16 {
     assert!(c < 3);
-
-    let width = orig[0].len();
-    let height = orig.len();
 
     let mut num: u64 = 0;
     let mut den: u64 = 0;
@@ -46,18 +43,18 @@ fn elect_qtz(orig: &Vec<Vec<RGBA16>>, r: (u16, u16), g: (u16, u16), b: (u16, u16
     match c {
         0 =>
             (r.0 ..= r.1).for_each(|p| {
-                num += p as u64 * cnt.0[p as usize] as u64;
-                den += cnt.0[p as usize] as u64;
+                num += p as u64 * cnt.0[p as usize];
+                den += cnt.0[p as usize];
             }),
         1 =>
             (g.0 ..= g.1).for_each(|p| {
-                num += p as u64 * cnt.1[p as usize] as u64;
-                den += cnt.1[p as usize] as u64;
+                num += p as u64 * cnt.1[p as usize];
+                den += cnt.1[p as usize];
             }),
         2 =>
             (b.0 ..= b.1).for_each(|p| {
-                num += p as u64 * cnt.2[p as usize] as u64;
-                den += cnt.2[p as usize] as u64;
+                num += p as u64 * cnt.2[p as usize];
+                den += cnt.2[p as usize];
             }),
         _ => panic!("bad call of elect_qtz")
     };
@@ -141,6 +138,7 @@ fn elect_qtz(orig: &Vec<Vec<RGBA16>>, r: (u16, u16), g: (u16, u16), b: (u16, u16
     //}
 }
 
+#[allow(clippy::too_many_arguments)]
 fn elect_palette_sub(orig: &Vec<Vec<RGBA16>>, r: (u16, u16), g: (u16, u16), b: (u16, u16), bits: usize, c: usize, pal: &mut Vec<RGBA>, cnt: (&[u64], &[u64], &[u64])) {
     assert!(c < 3);
 
@@ -283,6 +281,28 @@ fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, _alpha: bool, pt: Palette) ->
 /// Convert RGBA HDR to any format.
 pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData, String> {
     // TODO verify if dims ok (?)
+
+    if orig.is_empty() {
+        return Err("empty image for convert_hdr".to_string())
+    }
+
+    let w = orig[0].len();
+
+    if w == 0 {
+        return Err("empty image for convert_hdr".to_string())
+    }
+
+    let mut err: Option<String> = None;
+
+    orig.iter().for_each(|row| {
+        if row.len() != w {
+            err = Some("inconsistent rows - convert_hdr".to_string())
+        }
+    });
+
+    if let Some(e) = err {
+        return Err(e);
+    }
 
     match dest {
         ColorType::RGBA16 =>
