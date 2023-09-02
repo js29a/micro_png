@@ -2,8 +2,32 @@
 
 use crate::*;
 
-fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool) -> Result<ImageData, String> {
-    Err("to be done".to_string())
+fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale) -> Result<ImageData, String> {
+    //  0.299 0.587 0.114
+
+    if alpha {
+        let res = orig.iter().map(|line| {
+            line.iter().map(|(r, g, b, a)| {
+                let y = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
+                (
+                    (y * ((1 << (bits - 1)) as f32)) as u16,
+                    *a / ( if bits == 8  { 256 } else { 1 })
+                )
+            }).collect()
+        }).collect();
+
+        Ok(ImageData::GRAYA(vec![res], gs))
+    }
+    else {
+        let res = orig.iter().map(|line| {
+            line.iter().map(|(r, g, b, a)| {
+                let y = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
+                (y * ((1 << (bits - 1)) as f32)) as u16
+            }).collect()
+        }).collect();
+
+        Ok(ImageData::GRAY(vec![res], gs))
+    }
 }
 
 //fn to_palette(orig: Vec<Vec<RGBA16>>, bits: usize) -> Result<ImageData, String> {
@@ -22,7 +46,7 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData,
                 ImageData::RGB16(
                     vec![
                         orig.iter().map(|line| {
-                            line.iter().map(|(r, g, b, a)| {
+                            line.iter().map(|(r, g, b, _a)| {
                                 (*r, *g, *b)
                             }).collect()
                         }).collect()
@@ -53,7 +77,7 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData,
                 ImageData::RGB(
                     vec![
                         orig.iter().map(|line| {
-                            line.iter().map(|(r, g, b, a)| {
+                            line.iter().map(|(r, g, b, _a)| {
                                 (
                                     (*r >> 8) as u8,
                                     (*g >> 8) as u8,
@@ -65,13 +89,13 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData,
                 )
             )
         },
-        ColorType::GRAY(Grayscale::G1) => to_grayscale(orig, 1, false),
-        ColorType::GRAY(Grayscale::G2) => to_grayscale(orig, 2, false),
-        ColorType::GRAY(Grayscale::G4) => to_grayscale(orig, 4, false),
-        ColorType::GRAY(Grayscale::G8) => to_grayscale(orig, 8, false),
-        ColorType::GRAY(Grayscale::G16) => to_grayscale(orig, 8, false),
-        ColorType::GRAYA(Grayscale::G8) => to_grayscale(orig, 4, true),
-        ColorType::GRAYA(Grayscale::G16) => to_grayscale(orig, 8, true),
+        ColorType::GRAY(Grayscale::G1) => to_grayscale(orig, 1, false, Grayscale::G1),
+        ColorType::GRAY(Grayscale::G2) => to_grayscale(orig, 2, false, Grayscale::G2),
+        ColorType::GRAY(Grayscale::G4) => to_grayscale(orig, 4, false, Grayscale::G4),
+        ColorType::GRAY(Grayscale::G8) => to_grayscale(orig, 8, false, Grayscale::G8),
+        ColorType::GRAY(Grayscale::G16) => to_grayscale(orig, 16, false, Grayscale::G16),
+        ColorType::GRAYA(Grayscale::G8) => to_grayscale(orig, 8, true, Grayscale::G8),
+        ColorType::GRAYA(Grayscale::G16) => to_grayscale(orig, 16, true, Grayscale::G16),
         _ => Err("to be done".to_string())
     }
 }
@@ -88,6 +112,13 @@ mod tests {
             ColorType::RGB16, // remove alpha
             ColorType::RGBA,
             ColorType::RGB,
+            ColorType::GRAYA(Grayscale::G16),
+            ColorType::GRAYA(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G16),
+            ColorType::GRAY(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G4),
+            ColorType::GRAY(Grayscale::G2),
+            ColorType::GRAY(Grayscale::G1),
         ];
 
         let orig = read_png(ORIG).unwrap();
