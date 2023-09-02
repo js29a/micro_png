@@ -3539,4 +3539,61 @@ mod tests {
         assert_eq!(meta["Comment"], "test comment");
         assert_eq!(meta["Author"], "test author");
     }
+
+    #[test]
+    #[should_panic(expected = "the image is empty")]
+    fn test_no_frames() {
+        build_apng(
+            APNGBuilder::new("tmp/panic-0.png", ImageData::RGBA(vec![]))
+        ).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "the height is zero")]
+    fn test_zero_h() {
+        build_apng(
+            APNGBuilder::new("tmp/panic-0.png", ImageData::RGBA(vec![vec![]]))
+        ).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "the width is zero")]
+    fn test_zero_w() {
+        build_apng(
+            APNGBuilder::new("tmp/panic-0.png", ImageData::RGBA(vec![vec![vec![]]]))
+        ).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "bad frame #1 height: 2 instead of 1")]
+    fn test_bad_h() {
+        build_apng(
+            APNGBuilder::new("tmp/panic-0.png", ImageData::RGBA(vec![
+                    vec![
+                        vec![(0, 0, 0, 0)]
+                    ],
+                    vec![
+                        vec![(0, 0, 0, 0)],
+                        vec![(0, 0, 0, 0)]
+                    ]
+            ]))
+        ).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "bad line width #0 at frame #1 height: 2 instead of 1")]
+    fn test_bad_w() {
+        build_apng(
+            APNGBuilder::new("tmp/panic-0.png", ImageData::RGBA(vec![
+                    vec![
+                        vec![(0, 0, 0, 0)],
+                        vec![(0, 0, 0, 0)]
+                    ],
+                    vec![
+                        vec![(0, 0, 0, 0), (0, 0, 0, 0)],
+                        vec![(0, 0, 0, 0)],
+                    ]
+            ]))
+        ).unwrap();
+    }
 }
