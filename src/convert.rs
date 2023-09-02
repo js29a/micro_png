@@ -32,10 +32,16 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale)
     }
 }
 
+type Cube = Vec<Vec<Vec<u64>>>;
+
+struct Qtz {
+    cube: Cube
+}
+
 // c -> component #, 0 .. 2
-fn elect_qtz(mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), c: usize,
-    cnt: (&[u64], &[u64], &[u64]), cube: &Vec<Vec<Vec<u64>>>) -> u16 {
+fn elect_qtz(mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), c: usize, qtz: &Qtz) -> u16 {
     assert!(c < 3);
+
     assert!(r.0 <= r.1);
     assert!(g.0 <= g.1);
     assert!(b.0 <= b.1);
@@ -48,34 +54,12 @@ fn elect_qtz(mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), c: usize,
     g.1 >>= 8;
     b.1 >>= 8;
 
-    //let mut num: u64 = 0;
-    //let mut den: u64 = 0;
-
-    //match c {
-        //0 =>
-            //(r.0 ..= r.1).for_each(|p| {
-                //num += p as u64 * cnt.0[p as usize];
-                //den += cnt.0[p as usize];
-            //}),
-        //1 =>
-            //(g.0 ..= g.1).for_each(|p| {
-                //num += p as u64 * cnt.1[p as usize];
-                //den += cnt.1[p as usize];
-            //}),
-        //2 =>
-            //(b.0 ..= b.1).for_each(|p| {
-                //num += p as u64 * cnt.2[p as usize];
-                //den += cnt.2[p as usize];
-            //}),
-        //_ => panic!("bad call of elect_qtz")
-    //};
-
     let mut vec: Vec<u16> = Vec::new();
 
     (r.0 ..= r.1).for_each(|rr| {
         (g.0 ..= g.1).for_each(|gg| {
             (b.0 ..= b.1).for_each(|bb| {
-                let cnt = cube[(rr >> 0) as usize][(gg >> 0) as usize][(bb >> 0) as usize];
+                let cnt = qtz.cube[rr as usize][gg as usize][bb as usize];
                 (0 .. cnt).for_each(|_| {
                     match c {
                         0 => vec.push(rr << 8),
@@ -87,30 +71,6 @@ fn elect_qtz(mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), c: usize,
             });
         });
     });
-
-
-    //match c {
-        //0 =>
-            //(r.0 ..= r.1).for_each(|p| {
-                //(0 .. cnt.0[p as usize]).for_each(|_| {
-                    //vec.push(p);
-                //});
-            //}),
-        //1 =>
-            //(g.0 ..= g.1).for_each(|p| {
-                //(0 .. cnt.1[p as usize]).for_each(|_| {
-                    //vec.push(p);
-                //});
-            //}),
-        //2 =>
-            //(b.0 ..= b.1).for_each(|p| {
-                //(0 .. cnt.2[p as usize]).for_each(|_| {
-                    //vec.push(p);
-                //});
-            //}),
-
-        //_ => panic!("bad call of elect_qtz")
-    //};
 
     if vec.is_empty() {
         match c {
@@ -125,107 +85,7 @@ fn elect_qtz(mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), c: usize,
     }
 }
 
-fn shrink(what: &mut (u16, u16), dom: &[u64]) -> u64 {
-    let mut any = false;
-
-    let mut num = 0_u64;
-    let mut den = 0_u64;
-
-    (what.0 ..= what.1).for_each(|k| {
-        if dom[k as usize] > 0 {
-            any = true
-        }
-
-        num += k as u64 * dom[k as usize];
-        den += dom[k as usize];
-    });
-
-    if !any {
-        let avg = ((what.0 as u32 + what.1 as u32) >> 1) as u16;
-        what.0 = avg;
-        what.1 = avg;
-        return 0
-    }
-
-    while dom[what.0 as usize] == 0 {
-        what.0 += 1
-    }
-
-    while dom[what.1 as usize] == 0 {
-        what.1 -= 1
-    }
-
-    if what.0 == what.1 {
-        return 0
-    }
-
-
-    // TODO mediane?
-    let avg = num / den;
-
-    //let a = what.1 as u64 - avg;
-    //let b = avg - what.0 as u64;
-
-
-    //let mut vec: Vec<u16> = Vec::new();
-
-    //(what.0 ..= what.1).for_each(|v| {
-        //(0 .. dom[v as usize]).for_each(|_| {
-            //vec.push(v);
-        //});
-    //});
-
-    //let avg = vec[vec.len() / 2];
-
-    //let a = what.1 as u64 - avg;
-    //let b = avg - what.0 as u64;
-
-    //a.max(b)
-    
-    let dist: i32 = avg as i32 - (what.1 as i32 + what.0 as i32) / 2;
-
-    dist.abs() as u64
-
-    //avg - (what.1 + what.0)
-
-    //what.1 as u64 - what.0 as u64
-
-    //u64::min(a, b) * (what.1 as u64 - what.0 as u64)
-    //u64::min(a, b) * (what.1 as u64 - what.0 as u64)
-}
-
-fn power(r: (u16, u16), g: (u16, u16), b: (u16, u16), cube: &Vec<Vec<Vec<u64>>>) -> u64 {
-    let mut res = 0_u64;
-
-    (r.0 >> 8 .. r.1 >> 8).for_each(|r| {
-        (g.0 >> 8 .. g.1 >> 8).for_each(|g| {
-            (b.0 >> 8 .. b.1 >> 8).for_each(|b| {
-                res += cube[r as usize][g as usize][b as usize]
-            })
-        })
-    });
-
-    res
-}
-
-fn elect_div(r: (u16, u16), g: (u16, u16), b: (u16, u16), cnt: (&[u64], &[u64], &[u64]), cube: &Vec<Vec<Vec<u64>>>) -> usize {
-    //let split_r = elect_qtz(r, g, b, 0, cnt, cube);
-    //let split_g = elect_qtz(r, g, b, 1, cnt, cube);
-    //let split_b = elect_qtz(r, g, b, 2, cnt, cube);
-
-    //let r_lo = power((r.0, split_r), g, b, cube);
-    //let r_hi = power((split_r, r.1), g, b, cube);
-
-    //let g_lo = power(r, (g.0, split_g), b, cube);
-    //let g_hi = power(r, (split_g, g.1), b, cube);
-
-    //let b_lo = power(r, g, (b.0, split_b), cube);
-    //let b_hi = power(r, g, (split_b, b.1), cube);
-
-    //let r_dist = (r_hi as i64 - r_lo as i64).abs();
-    //let g_dist = (g_hi as i64 - g_lo as i64).abs();
-    //let b_dist = (b_hi as i64 - b_lo as i64).abs();
-
+fn elect_div(r: (u16, u16), g: (u16, u16), b: (u16, u16)) -> usize {
     let r_dist = r.1 - r.0;
     let g_dist = g.1 - g.0;
     let b_dist = b.1 - b.0;
@@ -241,13 +101,11 @@ fn elect_div(r: (u16, u16), g: (u16, u16), b: (u16, u16), cnt: (&[u64], &[u64], 
     }
 }
 
-fn elect_palette_sub(mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), bits: usize, c: usize, pal: &mut Vec<RGBA>, cnt: (&[u64], &[u64], &[u64]), cube: &Vec<Vec<Vec<u64>>>) {
-    assert!(c < 3);
-
+fn elect_palette_sub(r: (u16, u16), g: (u16, u16), b: (u16, u16), bits: usize, pal: &mut Vec<RGBA>, qtz: &Qtz) {
     if bits == 0 {
-        let q_0 = elect_qtz(r, g, b, 0, cnt, cube);
-        let q_1 = elect_qtz(r, g, b, 1, cnt, cube);
-        let q_2 = elect_qtz(r, g, b, 2, cnt, cube);
+        let q_0 = elect_qtz(r, g, b, 0, qtz);
+        let q_1 = elect_qtz(r, g, b, 1, qtz);
+        let q_2 = elect_qtz(r, g, b, 2, qtz);
 
         pal.push((
             (q_0 >> 8) as u8,
@@ -256,46 +114,23 @@ fn elect_palette_sub(mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), bi
             0xff
         ));
     }
-    else {// TODO shrink box then select most wide
-        let vol_r = shrink(&mut r, cnt.0);
-        let vol_g = shrink(&mut g, cnt.1);
-        let vol_b = shrink(&mut b, cnt.2);
+    else {
+        let c1 = elect_div(r, g, b);
 
-        //let m_r = elect_qtz(r, g, b, 0, cnt);
-        //let m_g = elect_qtz(r, g, b, 0, cnt);
-        //let m_b = elect_qtz(r, g, b, 0, cnt);
+        let split = elect_qtz(r, g, b, c1, qtz);
 
-        //let c1 = if vol_r > vol_g && vol_r > vol_b {
-            //assert!(vol_r >= vol_g && vol_r >= vol_b);
-            //0
-        //}
-        //else if vol_g > vol_b {
-            //assert!(vol_g >= vol_r && vol_g >= vol_b);
-            //1
-        //}
-        //else {
-            //assert!(vol_b >= vol_r && vol_b >= vol_g);
-            //2
-        //};
-
-        //let c1 = power(r, g, b, cube);
-
-        let c1 = elect_div(r, g, b, cnt, cube);
-
-        let split = elect_qtz(r, g, b, c1, cnt, cube);
-
-        match c1 {// TODO remove 'c' param
+        match c1 {
             0 => {
-                elect_palette_sub((r.0, split), g, b, bits - 1, (c + 1) % 3, pal, cnt, cube);
-                elect_palette_sub((split, r.1), g, b, bits - 1, (c + 1) % 3, pal, cnt, cube);
+                elect_palette_sub((r.0, split), g, b, bits - 1,  pal, qtz);
+                elect_palette_sub((split, r.1), g, b, bits - 1,  pal, qtz);
             },
             1 => {
-                elect_palette_sub(r, (g.0, split), b, bits - 1, (c + 1) % 3, pal, cnt, cube);
-                elect_palette_sub(r, (split, g.1), b, bits - 1, (c + 1) % 3, pal, cnt, cube);
+                elect_palette_sub(r, (g.0, split), b, bits - 1,  pal, qtz);
+                elect_palette_sub(r, (split, g.1), b, bits - 1,  pal, qtz);
             },
             2 => {
-                elect_palette_sub(r, g, (b.0, split), bits - 1, (c + 1) % 3, pal, cnt, cube);
-                elect_palette_sub(r, g, (split, b.1), bits - 1, (c + 1) % 3, pal, cnt, cube);
+                elect_palette_sub(r, g, (b.0, split), bits - 1,  pal, qtz);
+                elect_palette_sub(r, g, (split, b.1), bits - 1,  pal, qtz);
             },
             _ => panic!("internal elect_palette_sub error")
         }
@@ -308,25 +143,20 @@ fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
     let width = orig[0].len();
     let height = orig.len();
 
-    let mut cnt_a = vec![0_u64; 0xffff + 1];
-    let mut cnt_g = vec![0_u64; 0xffff + 1];
-    let mut cnt_b = vec![0_u64; 0xffff + 1];
-
     let mut cube = vec![vec![vec![0_u64; 256]; 256]; 256];
 
     (0 .. height).for_each(|y| {
         (0 .. width).for_each(|x| {
             let pix = orig[y][x];
-            cnt_a[pix.0 as usize] += 1;
-            cnt_g[pix.1 as usize] += 1;
-            cnt_b[pix.2 as usize] += 1;
-
             cube[(pix.0 >> 8) as usize][(pix.1 >> 8) as usize][(pix.2 >> 8) as usize] += 1;
         });
     });
 
-    elect_palette_sub((0, 0xffff), (0, 0xffff), (0, 0xffff), bits, 0, &mut pal,
-        (&cnt_a[..], &cnt_g[..], &cnt_b[..]), &cube);
+    let qtz = Qtz {
+        cube
+    };
+
+    elect_palette_sub((0, 0xffff), (0, 0xffff), (0, 0xffff), bits, &mut pal, &qtz);
     assert_eq!(pal.len(), 1 << bits);
     pal
 }
