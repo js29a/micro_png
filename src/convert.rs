@@ -105,31 +105,7 @@ fn elect_qtz(r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize, qtz: &mut Qt
     assert!(g.0 <= g.1);
     assert!(b.0 <= b.1);
 
-    //r.0 >>= 8;
-    //g.0 >>= 8;
-    //b.0 >>= 8;
-
-    //r.1 >>= 8;
-    //g.1 >>= 8;
-    //b.1 >>= 8;
-
     let vec = qtz.fill_vec(r, g, b, c);
-
-    //(r.0 ..= r.1).for_each(|rr| {
-        //(g.0 ..= g.1).for_each(|gg| {
-            //(b.0 ..= b.1).for_each(|bb| {
-                //let cnt = qtz.cube[rr as usize][gg as usize][bb as usize];
-                //(0 .. cnt).for_each(|_| {
-                    //match c {
-                        //0 => vec.push(rr << 8),
-                        //1 => vec.push(gg << 8),
-                        //2 => vec.push(bb << 8),
-                        //_ => panic!("bad call of elect_qtz")
-                    //}
-                //});
-            //});
-        //});
-    //});
 
     if vec.is_empty() {
         match c {
@@ -212,7 +188,6 @@ fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
             let bb = pix.2 >> 8;
             let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | ((bb as u32) << 0);
             cube[offs as usize] += 1;
-            //cube[(pix.0 >> 8) as usize][(pix.1 >> 8) as usize][(pix.2 >> 8) as usize] += 1;
         });
     });
 
@@ -387,17 +362,17 @@ mod tests {
     #[test]
     pub fn test_convert() {
         let targets = vec![
-            //ColorType::RGBA16, // remove alpha
-            //ColorType::RGB16, // remove alpha
-            //ColorType::RGBA,
-            //ColorType::RGB,
-            //ColorType::GRAYA(Grayscale::G16),
-            //ColorType::GRAYA(Grayscale::G8),
-            //ColorType::GRAY(Grayscale::G16),
-            //ColorType::GRAY(Grayscale::G8),
-            //ColorType::GRAY(Grayscale::G4),
-            //ColorType::GRAY(Grayscale::G2),
-            //ColorType::GRAY(Grayscale::G1),
+            ColorType::RGBA16, // stupid test
+            ColorType::RGB16, // remove alpha
+            ColorType::RGBA,
+            ColorType::RGB,
+            ColorType::GRAYA(Grayscale::G16),
+            ColorType::GRAYA(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G16),
+            ColorType::GRAY(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G4),
+            ColorType::GRAY(Grayscale::G2),
+            ColorType::GRAY(Grayscale::G1),
             ColorType::NDX(Palette::P1),
             ColorType::NDX(Palette::P2),
             ColorType::NDX(Palette::P4),
