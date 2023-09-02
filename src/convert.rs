@@ -2,6 +2,14 @@
 
 use crate::*;
 
+fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool) -> Result<ImageData, String> {
+    Err("to be done".to_string())
+}
+
+//fn to_palette(orig: Vec<Vec<RGBA16>>, bits: usize) -> Result<ImageData, String> {
+    //Err("to be done".to_string())
+//}
+
 pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData, String> {
     // TODO verify if dims ok (?)
 
@@ -10,7 +18,7 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData,
 
     match dest {
         ColorType::RGB16 => {
-            return Ok(
+            Ok(
                 ImageData::RGB16(
                     vec![
                         orig.iter().map(|line| {
@@ -20,10 +28,10 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData,
                         }).collect()
                     ]
                 )
-            );
+            )
         },
         ColorType::RGBA => {
-            return Ok(
+            Ok(
                 ImageData::RGBA(
                     vec![
                         orig.iter().map(|line| {
@@ -38,10 +46,10 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData,
                         }).collect()
                     ]
                 )
-            );
+            )
         },
         ColorType::RGB => {
-            return Ok(
+            Ok(
                 ImageData::RGB(
                     vec![
                         orig.iter().map(|line| {
@@ -55,8 +63,15 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData,
                         }).collect()
                     ]
                 )
-            );
+            )
         },
+        ColorType::GRAY(Grayscale::G1) => to_grayscale(orig, 1, false),
+        ColorType::GRAY(Grayscale::G2) => to_grayscale(orig, 2, false),
+        ColorType::GRAY(Grayscale::G4) => to_grayscale(orig, 4, false),
+        ColorType::GRAY(Grayscale::G8) => to_grayscale(orig, 8, false),
+        ColorType::GRAY(Grayscale::G16) => to_grayscale(orig, 8, false),
+        ColorType::GRAYA(Grayscale::G8) => to_grayscale(orig, 4, true),
+        ColorType::GRAYA(Grayscale::G16) => to_grayscale(orig, 8, true),
         _ => Err("to be done".to_string())
     }
 }
