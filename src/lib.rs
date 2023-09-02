@@ -24,10 +24,10 @@ pub type RGB = (u8, u8, u8);
 /// RGB + Alpha 8 bits.
 pub type RGBA = (u8, u8, u8, u8);
 
-/// RGB 16 bits.
+/// RGB 16 bits - HDR.
 pub type RGB16 = (u16, u16, u16);
 
-/// RGB + Alpha 16 bits.
+/// RGB + Alpha 16 bits - HDR.
 pub type RGBA16 = (u16, u16, u16, u16);
 
 /// Palette index.
@@ -145,7 +145,7 @@ pub enum ImageData {
     GRAYA(Vec<Vec<Vec<(u16, u16)>>>, Grayscale),
 }
 
-/// Image structure.
+/// Image structure - output data of [read_png] / [read_png_u8].
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct Image {
     color_type: ColorType,
@@ -1583,7 +1583,8 @@ pub fn write_apng_u8(image_data: ImageData, filter: Option<Filter>, progress: Op
 
 /// Write (A)PNG file.
 ///
-/// For plain PNG use one frame input.
+/// For plain PNG use one frame input - somewhat shorter than [APNGBuilder] method but with less
+/// options.
 ///
 /// # Arguments
 ///
@@ -2753,7 +2754,7 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
 ///
 /// (0 .. image.height()).for_each(|y| {
 ///   (0 .. image.width()).for_each(|x| {
-///     let _pixel = data[y][x]; // (u16, u16, u16, u16)
+///     let _pixel = data[y][x]; // (u16, u16, u16, u16) - R, G, B, A in HDR format.
 ///   });
 /// });
 /// ```

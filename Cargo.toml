@@ -1,6 +1,6 @@
 [package]
 name = "micro_png"
-license = "LGPL-3"
+license = "LGPL"
 homepage = "https://github.com/js29a/micro_png/wiki"
 # documentation = ""
 repository = "https://github.com/js29a/micro_png"
