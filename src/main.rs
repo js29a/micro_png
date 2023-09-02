@@ -143,7 +143,12 @@ fn from_wiki_animation() {
     });
 
     // 2. write it into a file
-    build_apng(APNGBuilder::new("tmp/test-APNG-RGBA.png", ImageData::RGBA(image_rgba))).unwrap();
+    build_apng(
+        APNGBuilder::new("tmp/test-APNG-RGBA.png", ImageData::RGBA(image_rgba))
+            .set_filter(Filter::Paeth) // gain some speed
+            .set_def_dur((50, 1000)) // set default frame duration to 50 / 1000 sec
+            .set_dur(10, (1000, 1000)) // set the 11th frame duration to 1000 / 1000 sec
+    ).unwrap();
 }
 
 fn from_wiki_u8() {

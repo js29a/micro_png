@@ -1370,6 +1370,41 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
 
     let frames = prepare_frames(image_data);
 
+    if frames.is_empty() {
+        return Err("the image is empty".to_string());
+    }
+
+    if frames[0].is_empty() {
+        return Err("the height is zero".to_string());
+    }
+
+    if frames[0][0].is_empty() {
+        return Err("the width is zero".to_string());
+    }
+
+    let mut err: Option<String> = None;
+
+    let h_ok = frames[0].len();
+    let w_ok = frames[0][0].len();
+
+    zip(0 .. frames.len(), frames.iter()).for_each(|(ff, f)| {
+        if f.len() != h_ok {
+            let l = f.len();
+            err = Some(format!("bad frame #{ff} height: {l} instead of {h_ok}"))
+        }
+
+        zip(0 .. frames[0].len(), f.iter()).for_each(|(rr, r)| {
+            if r.len() != w_ok {
+                let l = r.len();
+                err = Some(format!("bad line width #{rr} at frame #{ff} height: {l} instead of {w_ok}"))
+            }
+        });
+    });
+
+    if let Some(msg) = err {
+        return Err(msg)
+    }
+
     let mut res: Vec<u8> = vec![];
 
     res.extend(b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a");
