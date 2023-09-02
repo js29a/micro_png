@@ -34,7 +34,7 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale)
     }
 }
 
-type Cube = Vec<Vec<Vec<u64>>>;
+type Cube = Vec<u64>;
 
 struct Qtz {
     cube: Cube,
@@ -75,7 +75,10 @@ impl Qtz {
         (r.0 ..= r.1).for_each(|rr| {
             (g.0 ..= g.1).for_each(|gg| {
                 (b.0 ..= b.1).for_each(|bb| {
-                    let cnt = self.cube[rr as usize][gg as usize][bb as usize];
+                    let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | ((bb as u32) << 0);
+                    let cnt = self.cube[offs as usize];
+
+                    //let cnt = self.cube[rr as usize][gg as usize][bb as usize];
                     (0 .. cnt).for_each(|_| {
                         match c {
                             0 => output.push(rr << 8),
@@ -199,12 +202,17 @@ fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
     let width = orig[0].len();
     let height = orig.len();
 
-    let mut cube = vec![vec![vec![0_u64; 256]; 256]; 256];
+    let mut cube = vec![0_u64; 256 * 256 * 256];
 
     (0 .. height).for_each(|y| {
         (0 .. width).for_each(|x| {
             let pix = orig[y][x];
-            cube[(pix.0 >> 8) as usize][(pix.1 >> 8) as usize][(pix.2 >> 8) as usize] += 1;
+            let rr = pix.0 >> 8;
+            let gg = pix.1 >> 8;
+            let bb = pix.2 >> 8;
+            let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | ((bb as u32) << 0);
+            cube[offs as usize] += 1;
+            //cube[(pix.0 >> 8) as usize][(pix.1 >> 8) as usize][(pix.2 >> 8) as usize] += 1;
         });
     });
 
