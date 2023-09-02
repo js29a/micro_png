@@ -2,7 +2,7 @@
 //!
 //! Examples: <https://github.com/js29a/micro_png/wiki>
 
-mod convert;
+pub mod convert;
 
 use std::fs::File;
 use std::io::{Write, Read};

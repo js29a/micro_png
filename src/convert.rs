@@ -1,4 +1,6 @@
-///! Format conversion utilities.
+/// convert
+///
+/// Format conversion utilities.
 
 use crate::*;
 
@@ -20,7 +22,7 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale)
     }
     else {
         let res = orig.iter().map(|line| {
-            line.iter().map(|(r, g, b, a)| {
+            line.iter().map(|(r, g, b, _a)| {
                 let y = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
                 (y * ((1 << (bits - 1)) as f32)) as u16
             }).collect()
@@ -34,13 +36,15 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale)
     //Err("to be done".to_string())
 //}
 
+/// Convert RGBA HDR to any format.
 pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData, String> {
     // TODO verify if dims ok (?)
 
-    let width = orig.len();
-    let height = orig[0].len();
-
     match dest {
+        ColorType::RGBA16 => 
+            Ok(
+                ImageData::RGBA16(vec![orig])
+            ),
         ColorType::RGB16 => {
             Ok(
                 ImageData::RGB16(
@@ -109,6 +113,7 @@ mod tests {
     #[test]
     pub fn test_convert() {
         let targets = vec![
+            ColorType::RGBA16, // remove alpha
             ColorType::RGB16, // remove alpha
             ColorType::RGBA,
             ColorType::RGB,
