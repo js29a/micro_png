@@ -1,3 +1,10 @@
+## 0.3.5 (2023-09-02T08:07:28)
+  - strict frames checking
+  - some unpack_idat-related re-factoring
+  - full Adam7 coverage
+  - Cargo.toml metadata
+  - animation demo code
+
 ## 0.3.4 (2023-09-01T07:10:43)
   - compatibility with older vers of Rust
 
