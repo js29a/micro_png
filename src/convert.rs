@@ -4,7 +4,7 @@
 
 use crate::*;
 
-fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale) -> Result<ImageData, String> {
+fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale) -> ImageData {
     //  0.299 0.587 0.114
 
     if alpha {
@@ -18,7 +18,7 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale)
             }).collect()
         }).collect();
 
-        Ok(ImageData::GRAYA(vec![res], gs))
+        ImageData::GRAYA(vec![res], gs)
     }
     else {
         let res = orig.iter().map(|line| {
@@ -28,39 +28,176 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale)
             }).collect()
         }).collect();
 
-        Ok(ImageData::GRAY(vec![res], gs))
+        ImageData::GRAY(vec![res], gs)
     }
 }
 
-fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Result<Vec<RGBA>, String> {
-    let mut pal: Vec<RGBA> = vec![(0, 0, 0, 0); 1 << bits];
+// c -> component #, 0 .. 2
+fn elect_qtz(orig: &Vec<Vec<RGBA16>>, r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize) -> u16 {
+    assert!(c < 3);
 
-// 3 3 2 alpha 0xff
-    (0 .. 1 << bits).for_each(|n| {
-        let r = (n & 7) << 5;
-        let g = ((n >> 3) & 7) << 5;
-        let b = ((n >> 6) & 3) << 6;
-        pal[n] = (
-            r as u8,
-            g as u8,
-            b as u8,
-            0xff_u8
-        );
+    let width = orig[0].len();
+    let height = orig.len();
+
+    let mut avg: u64 = 0;
+    let mut cnt: u64 = 0;
+
+    (0 .. height).for_each(|y| {
+        (0 .. width).for_each(|x| {
+            let pix = orig[y][x];
+
+            match c {
+                0 => {
+                    if pix.0 >= r.0 && pix.0 <= r.1 {
+                        cnt += 1;
+                        avg += pix.0 as u64;
+                    }
+                },
+                1 => {
+                    if pix.1 >= g.0 && pix.1 <= g.1 {
+                        cnt += 1;
+                        avg += pix.1 as u64;
+                    }
+                },
+                2 => {
+                    if pix.2 >= b.0 && pix.2 <= b.1 {
+                        cnt += 1;
+                        avg += pix.2 as u64;
+                    }
+                },
+                _ => panic!("bad call of elect_qtz")
+            }
+        })
     });
 
-    Ok(pal)
+    if cnt == 0 {
+        match c {
+            0 => ((r.0 as u32 + r.1 as u32) >> 1) as u16,
+            1 => ((g.0 as u32 + g.1 as u32) >> 1) as u16,
+            2 => ((b.0 as u32 + b.1 as u32) >> 1) as u16,
+            _ => panic!("bad call of elect_qtz")
+        }
+    }
+    else {
+        (avg / cnt) as u16
+    }
+
+    //let mut vec: Vec<u16> = Vec::new();
+
+    //(0 .. height).for_each(|y| {
+        //(0 .. width).for_each(|x| {
+            //let pix = orig[y][x];
+
+            //match c {
+                //0 =>
+                    //if pix.0 >= r.0 && pix.0 <= r.1 {
+                        //vec.push(orig[y][x].0)
+                    //},
+                //1 =>
+                    //if pix.1 >= g.0 && pix.1 <= g.1 {
+                        //vec.push(orig[y][x].1)
+                    //},
+                //2 =>
+                    //if pix.2 >= b.0 && pix.2 <= b.1 {
+                        //vec.push(orig[y][x].2)
+                    //},
+                //_ => panic!("bad call of elect_qtz")
+            //}
+        //})
+    //});
+
+    //vec.sort();
+
+    //if vec.is_empty() {
+        //match c {
+            //0 => ((r.0 as u32 + r.1 as u32) >> 1) as u16,
+            //1 => ((g.0 as u32 + g.1 as u32) >> 1) as u16,
+            //2 => ((b.0 as u32 + b.1 as u32) >> 1) as u16,
+            //_ => panic!("bad call of elect_qtz")
+        //}
+    //}
+    //else {
+        //vec[vec.len() / 2]
+    //}
+}
+
+fn elect_palette_sub(orig: &Vec<Vec<RGBA16>>, mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), bits: usize, c: usize, pal: &mut Vec<RGBA>) {
+    assert!(c < 3);
+
+    if bits == 0 {
+        let width = orig[0].len();
+        let height = orig.len();
+
+        (0 .. height).for_each(|y| {
+            (0 .. width).for_each(|x| {
+                let pix = orig[y][x];
+
+                if pix.0 >= r.0 && pix.0 <= r.0 &&
+                   pix.1 >= g.0 && pix.1 <= g.1 &&
+                   pix.2 >= b.0 && pix.2 <= b.1 {
+                    r.0 = u16::min(r.0, pix.0);
+                    r.1 = u16::max(r.1, pix.0);
+                    g.0 = u16::min(g.0, pix.1);
+                    g.1 = u16::max(g.1, pix.1);
+                    b.0 = u16::min(b.0, pix.2);
+                    b.1 = u16::max(b.1, pix.2);
+                }
+            });
+        });
+
+        //let q_0 = elect_qtz(orig, r, g, b, 0);
+        //let q_1 = elect_qtz(orig, r, g, b, 1);
+        //let q_2 = elect_qtz(orig, r, g, b, 2);
+
+        let q_0 = (r.0 as u32 + r.1 as u32) >> 1;
+        let q_1 = (g.0 as u32 + g.1 as u32) >> 1;
+        let q_2 = (b.0 as u32 + b.1 as u32) >> 1;
+
+        pal.push((
+            (q_0 >> 8) as u8,
+            (q_1 >> 8) as u8,
+            (q_2 >> 8) as u8,
+            0xff
+        ));
+    }
+    else {
+        let split = elect_qtz(orig, r, g, b, c);
+
+        match c {
+            0 => {
+                elect_palette_sub(orig, (r.0, split), g, b, bits - 1, (c + 1) % 3, pal);
+                elect_palette_sub(orig, (split, r.1), g, b, bits - 1, (c + 1) % 3, pal);
+            },
+            1 => {
+                elect_palette_sub(orig, r, (g.0, split), b, bits - 1, (c + 1) % 3, pal);
+                elect_palette_sub(orig, r, (split, g.1), b, bits - 1, (c + 1) % 3, pal);
+            },
+            2 => {
+                elect_palette_sub(orig, r, g, (b.0, split), bits - 1, (c + 1) % 3, pal);
+                elect_palette_sub(orig, r, g, (split, b.1), bits - 1, (c + 1) % 3, pal);
+            },
+            _ => panic!("internal elect_palette_sub error")
+        }
+    }
+}
+
+fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
+    let mut pal: Vec<RGBA> = Vec::new();
+
+    elect_palette_sub(orig, (0, 0xffff), (0, 0xffff), (0, 0xffff), bits, 0, &mut pal);
+    assert_eq!(pal.len(), 1 << bits);
+    pal
 }
 
 // TODO strip alpha from palette for NDX no A modes
-fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, pt: Palette) -> Result<ImageData, String> {
-    let pal = elect_palette(&orig, bits)?;
+fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, _alpha: bool, pt: Palette) -> ImageData {
+    let pal = elect_palette(&orig, bits);
     assert_eq!(pal.len(), 1 << bits);
 
     let width = orig[0].len();
     let height = orig.len();
 
     // TODO alpha level
-    //let mut closest: [[[Option<u8>; 256]; 256]; 256] = [[[None; 256]; 256]; 256];
     let mut closest: Vec<Vec<Vec<Option<u8>>>> = vec![vec![vec![None; 256]; 256]; 256];
 
     let mut res = vec![vec![0_u8; width]; height];
@@ -103,7 +240,7 @@ fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, pt: Palette) -> 
         });
     });
 
-    Ok(ImageData::NDXA(vec![res], pal, pt))
+    ImageData::NDXA(vec![res], pal, pt)
 }
 
 /// Convert RGBA HDR to any format.
@@ -163,21 +300,21 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData,
                 )
             )
         },
-        ColorType::GRAY(Grayscale::G1) => to_grayscale(orig, 1, false, Grayscale::G1),
-        ColorType::GRAY(Grayscale::G2) => to_grayscale(orig, 2, false, Grayscale::G2),
-        ColorType::GRAY(Grayscale::G4) => to_grayscale(orig, 4, false, Grayscale::G4),
-        ColorType::GRAY(Grayscale::G8) => to_grayscale(orig, 8, false, Grayscale::G8),
-        ColorType::GRAY(Grayscale::G16) => to_grayscale(orig, 16, false, Grayscale::G16),
-        ColorType::GRAYA(Grayscale::G8) => to_grayscale(orig, 8, true, Grayscale::G8),
-        ColorType::GRAYA(Grayscale::G16) => to_grayscale(orig, 16, true, Grayscale::G16),
-        ColorType::NDXA(Palette::P1) => to_indexed(orig, 1, true, Palette::P1),
-        ColorType::NDXA(Palette::P2) => to_indexed(orig, 2, true, Palette::P2),
-        ColorType::NDXA(Palette::P4) => to_indexed(orig, 4, true, Palette::P4),
-        ColorType::NDXA(Palette::P8) => to_indexed(orig, 8, true, Palette::P8),
-        ColorType::NDX(Palette::P1) => to_indexed(orig, 1, false, Palette::P1),
-        ColorType::NDX(Palette::P2) => to_indexed(orig, 2, false, Palette::P2),
-        ColorType::NDX(Palette::P4) => to_indexed(orig, 4, false, Palette::P4),
-        ColorType::NDX(Palette::P8) => to_indexed(orig, 8, false, Palette::P8),
+        ColorType::GRAY(Grayscale::G1) => Ok(to_grayscale(orig, 1, false, Grayscale::G1)),
+        ColorType::GRAY(Grayscale::G2) => Ok(to_grayscale(orig, 2, false, Grayscale::G2)),
+        ColorType::GRAY(Grayscale::G4) => Ok(to_grayscale(orig, 4, false, Grayscale::G4)),
+        ColorType::GRAY(Grayscale::G8) => Ok(to_grayscale(orig, 8, false, Grayscale::G8)),
+        ColorType::GRAY(Grayscale::G16) => Ok(to_grayscale(orig, 16, false, Grayscale::G16)),
+        ColorType::GRAYA(Grayscale::G8) => Ok(to_grayscale(orig, 8, true, Grayscale::G8)),
+        ColorType::GRAYA(Grayscale::G16) => Ok(to_grayscale(orig, 16, true, Grayscale::G16)),
+        ColorType::NDXA(Palette::P1) => Ok(to_indexed(orig, 1, true, Palette::P1)),
+        ColorType::NDXA(Palette::P2) => Ok(to_indexed(orig, 2, true, Palette::P2)),
+        ColorType::NDXA(Palette::P4) => Ok(to_indexed(orig, 4, true, Palette::P4)),
+        ColorType::NDXA(Palette::P8) => Ok(to_indexed(orig, 8, true, Palette::P8)),
+        ColorType::NDX(Palette::P1) => Ok(to_indexed(orig, 1, false, Palette::P1)),
+        ColorType::NDX(Palette::P2) => Ok(to_indexed(orig, 2, false, Palette::P2)),
+        ColorType::NDX(Palette::P4) => Ok(to_indexed(orig, 4, false, Palette::P4)),
+        ColorType::NDX(Palette::P8) => Ok(to_indexed(orig, 8, false, Palette::P8)),
         _ => Err("to be done".to_string())
     }
 }
