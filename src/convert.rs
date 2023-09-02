@@ -2,6 +2,8 @@
 ///
 /// Format conversion utilities.
 
+use std::collections::HashMap;
+
 use crate::*;
 
 fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale) -> ImageData {
@@ -35,42 +37,96 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale)
 type Cube = Vec<Vec<Vec<u64>>>;
 
 struct Qtz {
-    cube: Cube
+    cube: Cube,
+    memo: HashMap<u64, Vec<u16>>
+}
+
+impl Qtz {
+    fn fill_vec(&mut self, mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), c: usize) -> Vec<u16> {
+        assert!(c < 3);
+
+        assert!(r.0 <= r.1);
+        assert!(g.0 <= g.1);
+        assert!(b.0 <= b.1);
+
+        let mut output: Vec<u16> = Vec::new();
+
+        r.0 >>= 8;
+        g.0 >>= 8;
+        b.0 >>= 8;
+
+        r.1 >>= 8;
+        g.1 >>= 8;
+        b.1 >>= 8;
+
+        let key: u64 =
+            (( c  as u64) << 48) |
+            ((r.0 as u64) << 40) |
+            ((r.1 as u64) << 32) |
+            ((g.0 as u64) << 24) |
+            ((g.1 as u64) << 16) |
+            ((b.0 as u64) <<  8) |
+            ((b.1 as u64) <<  0);
+
+        if let Some(v) = self.memo.get(&key) {
+            return v.clone();
+        }
+
+        (r.0 ..= r.1).for_each(|rr| {
+            (g.0 ..= g.1).for_each(|gg| {
+                (b.0 ..= b.1).for_each(|bb| {
+                    let cnt = self.cube[rr as usize][gg as usize][bb as usize];
+                    (0 .. cnt).for_each(|_| {
+                        match c {
+                            0 => output.push(rr << 8),
+                            1 => output.push(gg << 8),
+                            2 => output.push(bb << 8),
+                            _ => panic!("bad call of elect_qtz")
+                        }
+                    });
+                });
+            });
+        });
+
+        self.memo.insert(key, output.clone());
+
+        output
+    }
 }
 
 // c -> component #, 0 .. 2
-fn elect_qtz(mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), c: usize, qtz: &Qtz) -> u16 {
+fn elect_qtz(r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize, qtz: &mut Qtz) -> u16 {
     assert!(c < 3);
 
     assert!(r.0 <= r.1);
     assert!(g.0 <= g.1);
     assert!(b.0 <= b.1);
 
-    r.0 >>= 8;
-    g.0 >>= 8;
-    b.0 >>= 8;
+    //r.0 >>= 8;
+    //g.0 >>= 8;
+    //b.0 >>= 8;
 
-    r.1 >>= 8;
-    g.1 >>= 8;
-    b.1 >>= 8;
+    //r.1 >>= 8;
+    //g.1 >>= 8;
+    //b.1 >>= 8;
 
-    let mut vec: Vec<u16> = Vec::new();
+    let vec = qtz.fill_vec(r, g, b, c);
 
-    (r.0 ..= r.1).for_each(|rr| {
-        (g.0 ..= g.1).for_each(|gg| {
-            (b.0 ..= b.1).for_each(|bb| {
-                let cnt = qtz.cube[rr as usize][gg as usize][bb as usize];
-                (0 .. cnt).for_each(|_| {
-                    match c {
-                        0 => vec.push(rr << 8),
-                        1 => vec.push(gg << 8),
-                        2 => vec.push(bb << 8),
-                        _ => panic!("bad call of elect_qtz")
-                    }
-                });
-            });
-        });
-    });
+    //(r.0 ..= r.1).for_each(|rr| {
+        //(g.0 ..= g.1).for_each(|gg| {
+            //(b.0 ..= b.1).for_each(|bb| {
+                //let cnt = qtz.cube[rr as usize][gg as usize][bb as usize];
+                //(0 .. cnt).for_each(|_| {
+                    //match c {
+                        //0 => vec.push(rr << 8),
+                        //1 => vec.push(gg << 8),
+                        //2 => vec.push(bb << 8),
+                        //_ => panic!("bad call of elect_qtz")
+                    //}
+                //});
+            //});
+        //});
+    //});
 
     if vec.is_empty() {
         match c {
@@ -101,7 +157,7 @@ fn elect_div(r: (u16, u16), g: (u16, u16), b: (u16, u16)) -> usize {
     }
 }
 
-fn elect_palette_sub(r: (u16, u16), g: (u16, u16), b: (u16, u16), bits: usize, pal: &mut Vec<RGBA>, qtz: &Qtz) {
+fn elect_palette_sub(r: (u16, u16), g: (u16, u16), b: (u16, u16), bits: usize, pal: &mut Vec<RGBA>, qtz: &mut Qtz) {
     if bits == 0 {
         let q_0 = elect_qtz(r, g, b, 0, qtz);
         let q_1 = elect_qtz(r, g, b, 1, qtz);
@@ -152,11 +208,12 @@ fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
         });
     });
 
-    let qtz = Qtz {
-        cube
+    let mut qtz = Qtz {
+        cube,
+        memo: HashMap::new()
     };
 
-    elect_palette_sub((0, 0xffff), (0, 0xffff), (0, 0xffff), bits, &mut pal, &qtz);
+    elect_palette_sub((0, 0xffff), (0, 0xffff), (0, 0xffff), bits, &mut pal, &mut qtz);
     assert_eq!(pal.len(), 1 << bits);
     pal
 }
