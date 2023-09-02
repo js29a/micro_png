@@ -125,33 +125,33 @@ fn elect_palette_sub(orig: &Vec<Vec<RGBA16>>, mut r: (u16, u16), mut g: (u16, u1
     assert!(c < 3);
 
     if bits == 0 {
-        let width = orig[0].len();
-        let height = orig.len();
+        //let width = orig[0].len();
+        //let height = orig.len();
 
-        (0 .. height).for_each(|y| {
-            (0 .. width).for_each(|x| {
-                let pix = orig[y][x];
+        //(0 .. height).for_each(|y| {
+            //(0 .. width).for_each(|x| {
+                //let pix = orig[y][x];
 
-                if pix.0 >= r.0 && pix.0 <= r.0 &&
-                   pix.1 >= g.0 && pix.1 <= g.1 &&
-                   pix.2 >= b.0 && pix.2 <= b.1 {
-                    r.0 = u16::min(r.0, pix.0);
-                    r.1 = u16::max(r.1, pix.0);
-                    g.0 = u16::min(g.0, pix.1);
-                    g.1 = u16::max(g.1, pix.1);
-                    b.0 = u16::min(b.0, pix.2);
-                    b.1 = u16::max(b.1, pix.2);
-                }
-            });
-        });
+                //if pix.0 >= r.0 && pix.0 <= r.0 &&
+                   //pix.1 >= g.0 && pix.1 <= g.1 &&
+                   //pix.2 >= b.0 && pix.2 <= b.1 {
+                    //r.0 = u16::min(r.0, pix.0);
+                    //r.1 = u16::max(r.1, pix.0);
+                    //g.0 = u16::min(g.0, pix.1);
+                    //g.1 = u16::max(g.1, pix.1);
+                    //b.0 = u16::min(b.0, pix.2);
+                    //b.1 = u16::max(b.1, pix.2);
+                //}
+            //});
+        //});
 
-        //let q_0 = elect_qtz(orig, r, g, b, 0);
-        //let q_1 = elect_qtz(orig, r, g, b, 1);
-        //let q_2 = elect_qtz(orig, r, g, b, 2);
+        let q_0 = elect_qtz(orig, r, g, b, 0);
+        let q_1 = elect_qtz(orig, r, g, b, 1);
+        let q_2 = elect_qtz(orig, r, g, b, 2);
 
-        let q_0 = (r.0 as u32 + r.1 as u32) >> 1;
-        let q_1 = (g.0 as u32 + g.1 as u32) >> 1;
-        let q_2 = (b.0 as u32 + b.1 as u32) >> 1;
+        //let q_0 = (r.0 as u32 + r.1 as u32) >> 1;
+        //let q_1 = (g.0 as u32 + g.1 as u32) >> 1;
+        //let q_2 = (b.0 as u32 + b.1 as u32) >> 1;
 
         pal.push((
             (q_0 >> 8) as u8,
@@ -206,8 +206,8 @@ fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, _alpha: bool, pt: Palette) ->
         (0 .. width).for_each(|x| {
             let r = (orig[y][x].0 >> 8) as i32;
             let g = (orig[y][x].1 >> 8) as i32;
-            let b = (orig[y][x].1 >> 8) as i32;
-            let _a = (orig[y][x].1 >> 8) as i32;
+            let b = (orig[y][x].2 >> 8) as i32;
+            let _a = (orig[y][x].3 >> 8) as i32;
 
             let ndx = match closest[r as usize][g as usize][b as usize] {
                 Some(k) => k,
