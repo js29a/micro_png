@@ -86,9 +86,9 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
 
                 if err_diff {
                     back[y][x] = (
-                        p,
-                        p,
-                        p,
+                        p << (16 - bits as u16),
+                        p << (16 - bits as u16),
+                        p << (16 - bits as u16),
                         0xffff
                     )
                 }
@@ -110,29 +110,30 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
                     let p = v as u16;
 
                     let rev = (back[y][x].0 as i32) << (16_i32 - bits as i32);
+                    let rev = back[y][x].0;
                     let err_p: i32 = p as i32 - rev as i32;
                     let err_a: i32 = 0;
 
                     let err = (err_p, err_p, err_p, err_a);
 
                     if x + 1 < width {
-                        clamp_add(&mut back[y][x + 1], err, 7, 16, 0);
+                        clamp_add(&mut back[y][x + 1], err, 7, 16, 16);// TODO last arg out
                     }
                     if x > 1 && y + 1 < height {
-                        clamp_add(&mut back[y + 1][x - 1], err, 3, 16, 0);
+                        clamp_add(&mut back[y + 1][x - 1], err, 3, 16, 16);
                     }
                     if y + 1 < height {
-                        clamp_add(&mut back[y + 1][x], err, 5, 16, 0);
+                        clamp_add(&mut back[y + 1][x], err, 5, 16, 16);
                     }
                     if x + 1 < width && y + 1 < height {
-                        clamp_add(&mut back[y + 1][x + 1], err, 1, 16, 0);
+                        clamp_add(&mut back[y + 1][x + 1], err, 1, 16, 16);
                     }
                 });
             });
 
             res = back.iter().map(|line| {
                 line.iter().map(|(r, _g, _b, _a)| {
-                    *r
+                    *r >> (16_u16 - bits as u16)
                 }).collect()
             }).collect();
         }
