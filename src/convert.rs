@@ -101,6 +101,9 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
                     if x + 1 < width && y + 1 < height {
                         clamp_add(&mut back[y + 1][x + 1], err, 1, 16, 16);
                     }
+
+                    let p = (back[y][x].0 >> (16_u16 - bits as u16)) << (16_u16 - bits as u16);
+                    back[y][x] = ( p, p, p, a >> (16_u16 - bits as u16));
                 });
             });
 
@@ -167,6 +170,9 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
                     if x + 1 < width && y + 1 < height {
                         clamp_add(&mut back[y + 1][x + 1], err, 1, 16, 16);
                     }
+
+                    let p = (back[y][x].0 >> (16_u16 - bits as u16)) << (16_u16 - bits as u16);
+                    back[y][x] = ( p, p, p, 0xffff);
                 });
             });
 
@@ -457,6 +463,15 @@ fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, _alpha: bool, pt: Palette, er
                 if x + 1 < width && y + 1 < height {
                     clamp_add(&mut back[y + 1][x + 1], err, 1, 16, 16);
                 }
+
+                let ndx = closest(&mut buf, back[y][x], &pal[..]) as usize;
+
+                back[y][x] = (
+                    (pal[ndx].0 as u16) << 8,
+                    (pal[ndx].1 as u16) << 8,
+                    (pal[ndx].2 as u16) << 8,
+                    (pal[ndx].3 as u16) << 8
+                );
             });
         });
 
@@ -584,17 +599,17 @@ mod tests {
     #[test]
     pub fn test_convert() {
         let targets = vec![
-            //ColorType::RGBA16, // stupid test
-            //ColorType::RGB16, // remove alpha
-            //ColorType::RGBA,
-            //ColorType::RGB,
-            //ColorType::GRAYA(Grayscale::G16),
-            //ColorType::GRAYA(Grayscale::G8),
-            //ColorType::GRAY(Grayscale::G16),
-            //ColorType::GRAY(Grayscale::G8),
+            ColorType::RGBA16, // stupid test
+            ColorType::RGB16, // remove alpha
+            ColorType::RGBA,
+            ColorType::RGB,
+            ColorType::GRAYA(Grayscale::G16),
+            ColorType::GRAYA(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G16),
+            ColorType::GRAY(Grayscale::G8),
             ColorType::GRAY(Grayscale::G4),
-            //ColorType::GRAY(Grayscale::G2),
-            //ColorType::GRAY(Grayscale::G1),
+            ColorType::GRAY(Grayscale::G2),
+            ColorType::GRAY(Grayscale::G1),
             ColorType::NDX(Palette::P1),
             ColorType::NDX(Palette::P2),
             ColorType::NDX(Palette::P4),
@@ -620,13 +635,13 @@ mod tests {
             //ColorType::RGB16, // remove alpha
             //ColorType::RGBA,
             //ColorType::RGB,
-            //ColorType::GRAYA(Grayscale::G16),
-            //ColorType::GRAYA(Grayscale::G8),
-            //ColorType::GRAY(Grayscale::G16),
-            //ColorType::GRAY(Grayscale::G8),
-            //ColorType::GRAY(Grayscale::G4),
-            //ColorType::GRAY(Grayscale::G2),
-            //ColorType::GRAY(Grayscale::G1),
+            ColorType::GRAYA(Grayscale::G16),
+            ColorType::GRAYA(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G16),
+            ColorType::GRAY(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G4),
+            ColorType::GRAY(Grayscale::G2),
+            ColorType::GRAY(Grayscale::G1),
             ColorType::NDX(Palette::P1),
             ColorType::NDX(Palette::P2),
             ColorType::NDX(Palette::P4),
