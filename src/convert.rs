@@ -50,33 +50,74 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
     let mut back: Vec<Vec<(u16, u16, u16, u16)>> = if err_diff { vec![vec![(0, 0, 0, 0); width]; height] } else { vec![vec![]] };
 
     if alpha {
-        let res = orig.iter().map(|line| {
-            line.iter().map(|(r, g, b, a)| {
-                let v = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
+        let mut res = zip(0 .. height as usize, orig.iter()).map(|(y, line)| {
+            zip(0 .. width as usize, line.iter()).map(|(x, (r, g, b, a))| {
+                let r0 = (*r as f32) * 0.299;
+                let g0 = (*g as f32) * 0.587;
+                let b0 = (*b as f32) * 0.114;
+
+                let v = (r0 + g0 + b0) / 65535.0;
                 let p = ((v * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16;
-                //(
-                    //p,
-                    //*a / ( if bits == 8  { 256 } else { 1 })
-                //);
 
-                //if err_diff {
-                    //back[y][x] = (
-                        //p,
-                        //p,
-                        //p,
-                        //*a / ( if bits == 8  { 256 } else { 1 })
-                    //)
-                //}
+                if err_diff {
+                    back[y][x] = (
+                        p << (16 - bits as u16),
+                        p << (16 - bits as u16),
+                        p << (16 - bits as u16),
+                        *a >> if bits == 8 { 8 } else { 0 }
+                    )
+                }
 
-                (p, *a / ( if bits == 8  { 256 } else { 1 }))
+                (p, *a >> if bits == 8 { 8 } else { 0 })
             }).collect()
         }).collect();
+
+        if err_diff {
+            (0 .. height as usize).for_each(|y| {
+                (0 .. width as usize).for_each(|x| {
+                    let (r, g, b, a) = orig[y][x];
+
+                    let r0 = (r as f32) * 0.299;
+                    let g0 = (g as f32) * 0.587;
+                    let b0 = (b as f32) * 0.114;
+
+                    let v = (r0 + g0 + b0);
+                    let p = v as u16;
+
+                    let rev = (back[y][x].0 as i32) << (16_i32 - bits as i32);
+                    let rev = back[y][x].0;
+                    let err_p: i32 = p as i32 - rev as i32;
+                    let err_a: i32 = 0;
+
+                    let err = (err_p, err_p, err_p, err_a);
+
+                    if x + 1 < width {
+                        clamp_add(&mut back[y][x + 1], err, 7, 16, 16);// TODO last arg out
+                    }
+                    if x > 1 && y + 1 < height {
+                        clamp_add(&mut back[y + 1][x - 1], err, 3, 16, 16);
+                    }
+                    if y + 1 < height {
+                        clamp_add(&mut back[y + 1][x], err, 5, 16, 16);
+                    }
+                    if x + 1 < width && y + 1 < height {
+                        clamp_add(&mut back[y + 1][x + 1], err, 1, 16, 16);
+                    }
+                });
+            });
+
+            res = back.iter().map(|line| {
+                line.iter().map(|(r, _g, _b, a)| {
+                    (*r >> (16_u16 - bits as u16), *a)
+                }).collect()
+            }).collect();
+        }
 
         ImageData::GRAYA(vec![res], gs)
     }
     else {
         let mut res = zip(0 .. height as usize, orig.iter()).map(|(y, line)| {
-            zip(0 .. width as usize, line.iter()).map(|(x, (r, g, b, _a))| {
+            zip(0 .. width as usize, line.iter()).map(|(x, (r, g, b, a))| {
                 let r0 = (*r as f32) * 0.299;
                 let g0 = (*g as f32) * 0.587;
                 let b0 = (*b as f32) * 0.114;
@@ -506,8 +547,8 @@ mod tests {
             //ColorType::RGB16, // remove alpha
             //ColorType::RGBA,
             //ColorType::RGB,
-            //ColorType::GRAYA(Grayscale::G16),
-            //ColorType::GRAYA(Grayscale::G8),
+            ColorType::GRAYA(Grayscale::G16),
+            ColorType::GRAYA(Grayscale::G8),
             ColorType::GRAY(Grayscale::G16),
             ColorType::GRAY(Grayscale::G8),
             ColorType::GRAY(Grayscale::G4),
