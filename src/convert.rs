@@ -117,29 +117,32 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
         ImageData::GRAYA(vec![res], gs)
     }
     else {
-        let mut res = zip(0 .. height as usize, orig.iter()).map(|(y, line)| {
-            zip(0 .. width as usize, line.iter()).map(|(x, (r, g, b, a))| {
-                let r0 = (*r as f32) * 0.299;
-                let g0 = (*g as f32) * 0.587;
-                let b0 = (*b as f32) * 0.114;
+        let res = if !err_diff {
+            zip(0 .. height as usize, orig.iter()).map(|(y, line)| {
+                zip(0 .. width as usize, line.iter()).map(|(x, (r, g, b, a))| {
+                    let r0 = (*r as f32) * 0.299;
+                    let g0 = (*g as f32) * 0.587;
+                    let b0 = (*b as f32) * 0.114;
 
-                let v = (r0 + g0 + b0) / 65535.0;
-                let p = ((v * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16;
+                    let v = (r0 + g0 + b0) / 65535.0;
+                    let p = ((v * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16;
 
-                if err_diff {
-                    back[y][x] = (
-                        p << (16 - bits as u16),
-                        p << (16 - bits as u16),
-                        p << (16 - bits as u16),
-                        0xffff
-                    )
-                }
+                    if err_diff {
+                        back[y][x] = (
+                            p << (16 - bits as u16),
+                            p << (16 - bits as u16),
+                            p << (16 - bits as u16),
+                            0xffff
+                        )
+                    }
 
-                p
+                    p
+                }).collect()
             }).collect()
-        }).collect();
+        }
+        else {
+            let mut back = orig.clone();
 
-        if err_diff {
             (0 .. height as usize).for_each(|y| {
                 (0 .. width as usize).for_each(|x| {
                     let (r, g, b, a) = orig[y][x];
@@ -151,8 +154,8 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
                     let v = (r0 + g0 + b0);
                     let p = v as u16;
 
-                    let rev = (back[y][x].0 as i32) << (16_i32 - bits as i32);
-                    let rev = back[y][x].0;
+                    //let rev = (back[y][x].0 as i32) << (16_i32 - bits as i32);
+                    let rev = (back[y][x].0 >> (16_i32 - bits as i32)) << (16_i32 - bits as i32);
                     let err_p: i32 = p as i32 - rev as i32;
                     let err_a: i32 = 0;
 
@@ -176,12 +179,12 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
                 });
             });
 
-            res = back.iter().map(|line| {
+            back.iter().map(|line| {
                 line.iter().map(|(r, _g, _b, _a)| {
                     *r >> (16_u16 - bits as u16)
                 }).collect()
-            }).collect();
-        }
+            }).collect()
+        };
 
         ImageData::GRAY(vec![res], gs)
     }
@@ -579,17 +582,17 @@ mod tests {
     #[test]
     pub fn test_convert() {
         let targets = vec![
-            //ColorType::RGBA16, // stupid test
-            //ColorType::RGB16, // remove alpha
-            //ColorType::RGBA,
-            //ColorType::RGB,
-            //ColorType::GRAYA(Grayscale::G16),
-            //ColorType::GRAYA(Grayscale::G8),
-            //ColorType::GRAY(Grayscale::G16),
-            //ColorType::GRAY(Grayscale::G8),
-            //ColorType::GRAY(Grayscale::G4),
-            //ColorType::GRAY(Grayscale::G2),
-            //ColorType::GRAY(Grayscale::G1),
+            ColorType::RGBA16, // stupid test
+            ColorType::RGB16, // remove alpha
+            ColorType::RGBA,
+            ColorType::RGB,
+            ColorType::GRAYA(Grayscale::G16),
+            ColorType::GRAYA(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G16),
+            ColorType::GRAY(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G4),
+            ColorType::GRAY(Grayscale::G2),
+            ColorType::GRAY(Grayscale::G1),
             ColorType::NDX(Palette::P1),
             ColorType::NDX(Palette::P2),
             ColorType::NDX(Palette::P4),
@@ -611,17 +614,17 @@ mod tests {
     #[test]
     pub fn test_convert_err_diff() {
         let targets = vec![
-            //ColorType::RGBA16, // stupid test
-            //ColorType::RGB16, // remove alpha
-            //ColorType::RGBA,
-            //ColorType::RGB,
-            //ColorType::GRAYA(Grayscale::G16),
-            //ColorType::GRAYA(Grayscale::G8),
-            //ColorType::GRAY(Grayscale::G16),
-            //ColorType::GRAY(Grayscale::G8),
-            //ColorType::GRAY(Grayscale::G4),
-            //ColorType::GRAY(Grayscale::G2),
-            //ColorType::GRAY(Grayscale::G1),
+            ColorType::RGBA16, // stupid test
+            ColorType::RGB16, // remove alpha
+            ColorType::RGBA,
+            ColorType::RGB,
+            ColorType::GRAYA(Grayscale::G16),
+            ColorType::GRAYA(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G16),
+            ColorType::GRAY(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G4),
+            ColorType::GRAY(Grayscale::G2),
+            ColorType::GRAY(Grayscale::G1),
             ColorType::NDX(Palette::P1),
             ColorType::NDX(Palette::P2),
             ColorType::NDX(Palette::P4),
