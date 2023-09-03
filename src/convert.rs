@@ -14,9 +14,19 @@ fn clamp_add(dest: &mut (u16, u16, u16, u16), mut val: (i32, i32, i32, i32), num
     val.3 = (val.3 as i64 * num as i64 / den as i64) as i32;
 
     dest.0 = (dest.0 as i32 + val.0).clamp(0, 0xffff) as u16;
+    dest.1 = (dest.1 as i32 + val.1).clamp(0, 0xffff) as u16;
+    dest.2 = (dest.2 as i32 + val.2).clamp(0, 0xffff) as u16;
+    dest.3 = (dest.3 as i32 + val.3).clamp(0, 0xffff) as u16;
+}
+
+fn clamp_add_gs(dest: &mut (u16, u16, u16, u16), mut val: (i32, i32), num: i32, den: i32) {
+    val.0 = (val.0 as i64 * num as i64 / den as i64) as i32;
+    val.1 = (val.1 as i64 * num as i64 / den as i64) as i32;
+
+    dest.0 = (dest.0 as i32 + val.0).clamp(0, 0xffff) as u16;
     dest.1 = (dest.1 as i32 + val.0).clamp(0, 0xffff) as u16;
     dest.2 = (dest.2 as i32 + val.0).clamp(0, 0xffff) as u16;
-    dest.3 = (dest.3 as i32 + val.0).clamp(0, 0xffff) as u16;
+    dest.3 = (dest.3 as i32 + val.1).clamp(0, 0xffff) as u16;
 }
 
 fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale, err_diff: bool) -> ImageData {
@@ -25,7 +35,7 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
     let width = orig[0].len();
     let height = orig.len();
 
-    let mut back: Vec<Vec<RGBA16>> = if err_diff { vec![vec![(0, 0, 0, 0); width]; height] } else { vec![vec![]] };
+    let mut back: Vec<Vec<(u16, u16, u16, u16)>> = if err_diff { vec![vec![(0, 0, 0, 0); width]; height] } else { vec![vec![]] };
 
     if alpha {
         let res = orig.iter().map(|line| {
@@ -55,7 +65,11 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
     else {
         let mut res = zip(0 .. height as usize, orig.iter()).map(|(y, line)| {
             zip(0 .. width as usize, line.iter()).map(|(x, (r, g, b, _a))| {
-                let v = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
+                let r0 = (*r as f32) * 0.299;
+                let g0 = (*g as f32) * 0.587;
+                let b0 = (*b as f32) * 0.114;
+
+                let v = (r0 + g0 + b0) / 65535.0;
                 let p = ((v * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16;
 
                 if err_diff {
@@ -74,37 +88,45 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
         if err_diff {
             (0 .. height as usize).for_each(|y| {
                 (0 .. width as usize).for_each(|x| {
-                    let err_r: i32 = orig[y][x].0 as i32 - back[y][x].0 as i32;
-                    let err_g: i32 = orig[y][x].1 as i32 - back[y][x].1 as i32;
-                    let err_b: i32 = orig[y][x].2 as i32 - back[y][x].2 as i32;
-                    let err_a: i32 = orig[y][x].3 as i32 - back[y][x].3 as i32;
+                    let (r, g, b, a) = orig[y][x];
 
-                    let err = (err_r, err_g, err_b, err_a);
+                    let r0 = (r as f32) * 0.299;
+                    let g0 = (g as f32) * 0.587;
+                    let b0 = (b as f32) * 0.114;
+
+                    let v = (r0 + g0 + b0) / 65535.0;
+                    let p = v as u16;
+
+                    let rev = back[y][x].0 << (16 - bits);
+                    let err_p: i32 = p as i32 - rev as i32;
+                    let err_a: i32 = 0;
+
+                    let err = (err_p, err_p, err_p, err_a);
 
                     if x + 1 < width {// 7 / 16
                         clamp_add(&mut back[y][x + 1], err, 7, 16);
                     }
                     if x > 1 && y + 1 < height {// 3 / 16
                         clamp_add(&mut back[y + 1][x - 1], err, 3, 16);
-                        //back[y + 1][x - 1] = 
                     }
                     if y + 1 < height {// 5 / 16
                         clamp_add(&mut back[y + 1][x], err, 5, 16);
-                        //back[y + 1][x] =
                     }
                     if x + 1 < width && y + 1 < height {// 1 / 16
                         clamp_add(&mut back[y + 1][x + 1], err, 1, 16);
-                        //back[y + 1][x + 1] = 
                     }
                 });
             });
 
             res = back.iter().map(|line| {
-                line.iter().map(|(r, g, b, _a)| {
-                    let y = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
-                    let p = ((y * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16;
+                line.iter().map(|(r, _g, _b, _a)| {
+                    //let v = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
+                    //let p = ((v * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16;
 
-                    p
+                    //let v = *r as f32;
+                    //let p = ((v * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16;
+
+                    *r
                 }).collect()
             }).collect();
         }
