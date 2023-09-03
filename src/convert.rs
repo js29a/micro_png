@@ -7,16 +7,28 @@ use std::collections::HashMap;
 
 use crate::*;
 
-fn clamp_add(dest: &mut (u16, u16, u16, u16), mut val: (i32, i32, i32, i32), num: i32, den: i32) {
-    val.0 = (val.0 as i64 * num as i64 / den as i64) as i32;
-    val.1 = (val.1 as i64 * num as i64 / den as i64) as i32;
-    val.2 = (val.2 as i64 * num as i64 / den as i64) as i32;
-    val.3 = (val.3 as i64 * num as i64 / den as i64) as i32;
+fn clamp_add(dest: &mut (u16, u16, u16, u16), mut val: (i32, i32, i32, i32), num: i32, den: i32, bits: usize) {
+    let b = 16_u16 - bits as u16;
+
+    val.0 = (val.0 as i32 * num as i32 / den as i32) as i32;
+    val.1 = (val.1 as i32 * num as i32 / den as i32) as i32;
+    val.2 = (val.2 as i32 * num as i32 / den as i32) as i32;
+    val.3 = (val.3 as i32 * num as i32 / den as i32) as i32;
+
+    dest.0 <<= b;
+    dest.1 <<= b;
+    dest.2 <<= b;
+    dest.3 <<= b;
 
     dest.0 = (dest.0 as i32 + val.0).clamp(0, 0xffff) as u16;
     dest.1 = (dest.1 as i32 + val.1).clamp(0, 0xffff) as u16;
     dest.2 = (dest.2 as i32 + val.2).clamp(0, 0xffff) as u16;
     dest.3 = (dest.3 as i32 + val.3).clamp(0, 0xffff) as u16;
+
+    dest.0 >>= b;
+    dest.1 >>= b;
+    dest.2 >>= b;
+    dest.3 >>= b;
 }
 
 fn clamp_add_gs(dest: &mut (u16, u16, u16, u16), mut val: (i32, i32), num: i32, den: i32) {
@@ -94,38 +106,32 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
                     let g0 = (g as f32) * 0.587;
                     let b0 = (b as f32) * 0.114;
 
-                    let v = (r0 + g0 + b0) / 65535.0;
+                    let v = (r0 + g0 + b0);
                     let p = v as u16;
 
-                    let rev = back[y][x].0 << (16 - bits);
+                    let rev = (back[y][x].0 as i32) << (16_i32 - bits as i32);
                     let err_p: i32 = p as i32 - rev as i32;
                     let err_a: i32 = 0;
 
                     let err = (err_p, err_p, err_p, err_a);
 
-                    if x + 1 < width {// 7 / 16
-                        clamp_add(&mut back[y][x + 1], err, 7, 16);
+                    if x + 1 < width {
+                        clamp_add(&mut back[y][x + 1], err, 7, 16, 0);
                     }
-                    if x > 1 && y + 1 < height {// 3 / 16
-                        clamp_add(&mut back[y + 1][x - 1], err, 3, 16);
+                    if x > 1 && y + 1 < height {
+                        clamp_add(&mut back[y + 1][x - 1], err, 3, 16, 0);
                     }
-                    if y + 1 < height {// 5 / 16
-                        clamp_add(&mut back[y + 1][x], err, 5, 16);
+                    if y + 1 < height {
+                        clamp_add(&mut back[y + 1][x], err, 5, 16, 0);
                     }
-                    if x + 1 < width && y + 1 < height {// 1 / 16
-                        clamp_add(&mut back[y + 1][x + 1], err, 1, 16);
+                    if x + 1 < width && y + 1 < height {
+                        clamp_add(&mut back[y + 1][x + 1], err, 1, 16, 0);
                     }
                 });
             });
 
             res = back.iter().map(|line| {
                 line.iter().map(|(r, _g, _b, _a)| {
-                    //let v = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
-                    //let p = ((v * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16;
-
-                    //let v = *r as f32;
-                    //let p = ((v * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16;
-
                     *r
                 }).collect()
             }).collect();
