@@ -10,10 +10,10 @@ use crate::*;
 fn clamp_add(dest: &mut (u16, u16, u16, u16), mut val: (i32, i32, i32, i32), num: i32, den: i32, bits: usize) {
     let b = 16_u16 - bits as u16;
 
-    val.0 = (val.0 as i32 * num as i32 / den as i32) as i32;
-    val.1 = (val.1 as i32 * num as i32 / den as i32) as i32;
-    val.2 = (val.2 as i32 * num as i32 / den as i32) as i32;
-    val.3 = (val.3 as i32 * num as i32 / den as i32) as i32;
+    val.0 = val.0 * num / den;
+    val.1 = val.1 * num / den;
+    val.2 = val.2 * num / den;
+    val.3 = val.3 * num / den;
 
     dest.0 <<= b;
     dest.1 <<= b;
@@ -31,16 +31,6 @@ fn clamp_add(dest: &mut (u16, u16, u16, u16), mut val: (i32, i32, i32, i32), num
     dest.3 >>= b;
 }
 
-fn clamp_add_gs(dest: &mut (u16, u16, u16, u16), mut val: (i32, i32), num: i32, den: i32) {
-    val.0 = (val.0 as i64 * num as i64 / den as i64) as i32;
-    val.1 = (val.1 as i64 * num as i64 / den as i64) as i32;
-
-    dest.0 = (dest.0 as i32 + val.0).clamp(0, 0xffff) as u16;
-    dest.1 = (dest.1 as i32 + val.0).clamp(0, 0xffff) as u16;
-    dest.2 = (dest.2 as i32 + val.0).clamp(0, 0xffff) as u16;
-    dest.3 = (dest.3 as i32 + val.1).clamp(0, 0xffff) as u16;
-}
-
 fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale, err_diff: bool) -> ImageData {
     let width = orig[0].len();
     let height = orig.len();
@@ -48,8 +38,8 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
     let mut back: Vec<Vec<(u16, u16, u16, u16)>> = if err_diff { vec![vec![(0, 0, 0, 0); width]; height] } else { vec![vec![]] };
 
     if alpha {
-        let mut res = zip(0 .. height as usize, orig.iter()).map(|(y, line)| {
-            zip(0 .. width as usize, line.iter()).map(|(x, (r, g, b, a))| {
+        let mut res = zip(0 .. height, orig.iter()).map(|(y, line)| {
+            zip(0 .. width, line.iter()).map(|(x, (r, g, b, a))| {
                 let r0 = (*r as f32) * 0.299;
                 let g0 = (*g as f32) * 0.587;
                 let b0 = (*b as f32) * 0.114;
@@ -71,18 +61,17 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
         }).collect();
 
         if err_diff {
-            (0 .. height as usize).for_each(|y| {
-                (0 .. width as usize).for_each(|x| {
+            (0 .. height).for_each(|y| {
+                (0 .. width).for_each(|x| {
                     let (r, g, b, a) = orig[y][x];
 
                     let r0 = (r as f32) * 0.299;
                     let g0 = (g as f32) * 0.587;
                     let b0 = (b as f32) * 0.114;
 
-                    let v = (r0 + g0 + b0);
+                    let v = r0 + g0 + b0;
                     let p = v as u16;
 
-                    let rev = (back[y][x].0 as i32) << (16_i32 - bits as i32);
                     let rev = back[y][x].0;
                     let err_p: i32 = p as i32 - rev as i32;
                     let err_a: i32 = 0;
@@ -118,8 +107,8 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
     }
     else {
         let res = if !err_diff {
-            zip(0 .. height as usize, orig.iter()).map(|(y, line)| {
-                zip(0 .. width as usize, line.iter()).map(|(x, (r, g, b, a))| {
+            zip(0 .. height, orig.iter()).map(|(y, line)| {
+                zip(0 .. width, line.iter()).map(|(x, (r, g, b, _a))| {
                     let r0 = (*r as f32) * 0.299;
                     let g0 = (*g as f32) * 0.587;
                     let b0 = (*b as f32) * 0.114;
@@ -143,15 +132,15 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
         else {
             let mut back = orig.clone();
 
-            (0 .. height as usize).for_each(|y| {
-                (0 .. width as usize).for_each(|x| {
-                    let (r, g, b, a) = orig[y][x];
+            (0 .. height).for_each(|y| {
+                (0 .. width).for_each(|x| {
+                    let (r, g, b, _a) = orig[y][x];
 
                     let r0 = (r as f32) * 0.299;
                     let g0 = (g as f32) * 0.587;
                     let b0 = (b as f32) * 0.114;
 
-                    let v = (r0 + g0 + b0);
+                    let v = r0 + g0 + b0;
                     let p = v as u16;
 
                     //let rev = (back[y][x].0 as i32) << (16_i32 - bits as i32);
@@ -222,7 +211,7 @@ impl Qtz {
             ((g.0 as u64) << 24) |
             ((g.1 as u64) << 16) |
             ((b.0 as u64) <<  8) |
-            ((b.1 as u64) <<  0);
+            ( b.1 as u64       );
 
         if let Some(v) = self.memo.get(&key) {
             return v.clone();
@@ -231,7 +220,7 @@ impl Qtz {
         (r.0 ..= r.1).for_each(|rr| {
             (g.0 ..= g.1).for_each(|gg| {
                 (b.0 ..= b.1).for_each(|bb| {
-                    let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | ((bb as u32) << 0);
+                    let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
                     let cnt = self.cube[offs as usize];
 
                     //let cnt = self.cube[rr as usize][gg as usize][bb as usize];
@@ -342,7 +331,7 @@ fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
             let rr = pix.0 >> 8;
             let gg = pix.1 >> 8;
             let bb = pix.2 >> 8;
-            let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | ((bb as u32) << 0);
+            let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
             cube[offs as usize] += 1;
         });
     });
@@ -368,7 +357,7 @@ fn closest(buf: &mut Closest, mut color: (u16, u16, u16, u16), pal: &[RGBA]) -> 
     let r = color.0 as i32;
     let g = color.1 as i32;
     let b = color.2 as i32;
-    let a = color.3 as i32;
+    //let a = color.3 as i32;
 
     match buf[r as usize][g as usize][b as usize] {
         Some(k) => k,
@@ -413,10 +402,10 @@ fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, _alpha: bool, pt: Palette, er
 
     (0 .. height).for_each(|y| {
         (0 .. width).for_each(|x| {
-            let r = (orig[y][x].0);
-            let g = (orig[y][x].1);
-            let b = (orig[y][x].2);
-            let a = (orig[y][x].3);
+            let r = orig[y][x].0;
+            let g = orig[y][x].1;
+            let b = orig[y][x].2;
+            let a = orig[y][x].3;
 
             let ndx = closest(&mut buf, (r, g, b, a), &pal[..]);
 
@@ -430,8 +419,8 @@ fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, _alpha: bool, pt: Palette, er
     else {
         let mut back = orig.clone();
 
-        (0 .. height as usize).for_each(|y| {
-            (0 .. width as usize).for_each(|x| {
+        (0 .. height).for_each(|y| {
+            (0 .. width).for_each(|x| {
                 let (r, g, b, a) = orig[y][x];
 
                 let ndx = closest(&mut buf, back[y][x], &pal[..]) as usize;
@@ -465,9 +454,8 @@ fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, _alpha: bool, pt: Palette, er
                     clamp_add(&mut back[y + 1][x + 1], err, 1, 16, 16);
                 }
 
-                let ndx = closest(&mut buf, back[y][x], &pal[..]) as u8;
-
-                res[y][x];
+                //let ndx = closest(&mut buf, back[y][x], &pal[..]) as u8;
+                //res[y][x];
             });
         });
 
