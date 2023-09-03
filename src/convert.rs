@@ -265,10 +265,30 @@ fn elect_qtz(r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize, qtz: &mut Qt
     }
 }
 
-fn elect_div(r: (u16, u16), g: (u16, u16), b: (u16, u16)) -> usize {
-    let r_dist = r.1 - r.0;
-    let g_dist = g.1 - g.0;
-    let b_dist = b.1 - b.0;
+fn elect_div(r: (u16, u16), g: (u16, u16), b: (u16, u16), qtz: &mut Qtz) -> usize {
+    //let r_dist = r.1 - r.0;
+    //let g_dist = g.1 - g.0;
+    //let b_dist = b.1 - b.0;
+
+    let vec_r = qtz.fill_vec(r, g, b, 0);
+    let vec_g = qtz.fill_vec(r, g, b, 1);
+    let vec_b = qtz.fill_vec(r, g, b, 2);
+
+    let r_avg = (if vec_r.is_empty() { 0 } else { vec_r[0] as usize + vec_r[vec_r.len() - 1] as usize }) / 2;
+    let g_avg = (if vec_g.is_empty() { 0 } else { vec_g[0] as usize + vec_g[vec_r.len() - 1] as usize }) / 2;
+    let b_avg = (if vec_b.is_empty() { 0 } else { vec_b[0] as usize + vec_b[vec_r.len() - 1] as usize }) / 2;
+
+    //let r_avg = (r.0 as usize + r.1 as usize) / 2;
+    //let g_avg = (g.0 as usize + g.1 as usize) / 2;
+    //let b_avg = (b.0 as usize + b.1 as usize) / 2;
+
+    let r_med = vec_r[vec_r.len() / 2] as usize;
+    let g_med = vec_g[vec_g.len() / 2] as usize;
+    let b_med = vec_b[vec_b.len() / 2] as usize;
+
+    let r_dist = if r_med > r_avg { r_med - r_avg } else { r_avg - r_med };
+    let g_dist = if g_med > g_avg { g_med - g_avg } else { g_avg - g_med };
+    let b_dist = if b_med > b_avg { b_med - b_avg } else { b_avg - b_med };
 
     if r_dist > g_dist && r_dist > b_dist {
         0
@@ -281,36 +301,38 @@ fn elect_div(r: (u16, u16), g: (u16, u16), b: (u16, u16)) -> usize {
     }
 }
 
-fn elect_palette_sub(r: (u16, u16), g: (u16, u16), b: (u16, u16), bits: usize, pal: &mut Vec<RGBA>, qtz: &mut Qtz) {
+fn elect_palette_sub(r: (u16, u16), g: (u16, u16), b: (u16, u16), bits: usize, pal: &mut Vec<RGBA>, qtz: &mut Qtz, max_ps: usize) {
     if bits == 0 {
         let q_0 = elect_qtz(r, g, b, 0, qtz);
         let q_1 = elect_qtz(r, g, b, 1, qtz);
         let q_2 = elect_qtz(r, g, b, 2, qtz);
 
-        pal.push((
-            (q_0 >> 8) as u8,
-            (q_1 >> 8) as u8,
-            (q_2 >> 8) as u8,
-            0xff
-        ));
+        if pal.len() < max_ps {
+            pal.push((
+                (q_0 >> 8) as u8,
+                (q_1 >> 8) as u8,
+                (q_2 >> 8) as u8,
+                0xff
+            ));
+        }
     }
     else {
-        let c1 = elect_div(r, g, b);
+        let c1 = elect_div(r, g, b, qtz);
 
         let split = elect_qtz(r, g, b, c1, qtz);
 
         match c1 {
             0 => {
-                elect_palette_sub((r.0, split), g, b, bits - 1,  pal, qtz);
-                elect_palette_sub((split, r.1), g, b, bits - 1,  pal, qtz);
+                elect_palette_sub((r.0, split), g, b, bits - 1,  pal, qtz, max_ps);
+                elect_palette_sub((split, r.1), g, b, bits - 1,  pal, qtz, max_ps);
             },
             1 => {
-                elect_palette_sub(r, (g.0, split), b, bits - 1,  pal, qtz);
-                elect_palette_sub(r, (split, g.1), b, bits - 1,  pal, qtz);
+                elect_palette_sub(r, (g.0, split), b, bits - 1,  pal, qtz, max_ps);
+                elect_palette_sub(r, (split, g.1), b, bits - 1,  pal, qtz, max_ps);
             },
             2 => {
-                elect_palette_sub(r, g, (b.0, split), bits - 1,  pal, qtz);
-                elect_palette_sub(r, g, (split, b.1), bits - 1,  pal, qtz);
+                elect_palette_sub(r, g, (b.0, split), bits - 1,  pal, qtz, max_ps);
+                elect_palette_sub(r, g, (split, b.1), bits - 1,  pal, qtz, max_ps);
             },
             _ => panic!("internal elect_palette_sub error")
         }
@@ -341,7 +363,22 @@ fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
         memo: HashMap::new()
     };
 
-    elect_palette_sub((0, 0xffff), (0, 0xffff), (0, 0xffff), bits, &mut pal, &mut qtz);
+    //if bits >= 4 {
+        //(0 .. 2).for_each(|r| {
+            //(0 .. 2).for_each(|g| {
+                //(0 .. 2).for_each(|b| {
+                    //pal.push((
+                        //if r == 0 { 0 } else { 255 },
+                        //if g == 0 { 0 } else { 255 },
+                        //if b == 0 { 0 } else { 255 },
+                        //0xff
+                    //));
+                //});
+            //});
+        //});
+    //}
+
+    elect_palette_sub((0, 0xffff), (0, 0xffff), (0, 0xffff), bits, &mut pal, &mut qtz, 1 << bits);
     assert_eq!(pal.len(), 1 << bits);
     pal
 }
