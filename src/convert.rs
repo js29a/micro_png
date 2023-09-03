@@ -383,9 +383,7 @@ fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
     pal
 }
 
-type Closest = Vec<Vec<Vec<Option<u8>>>>;
-
-fn closest(buf: &mut Closest, mut color: (u16, u16, u16, u16), pal: &[RGBA]) -> u8 {
+fn closest(buf: &mut [Option<u8>], mut color: (u16, u16, u16, u16), pal: &[RGBA]) -> u8 {
     color.0 >>= 8;
     color.1 >>= 8;
     color.2 >>= 8;
@@ -396,7 +394,9 @@ fn closest(buf: &mut Closest, mut color: (u16, u16, u16, u16), pal: &[RGBA]) -> 
     let b = color.2 as i32;
     //let a = color.3 as i32;
 
-    match buf[r as usize][g as usize][b as usize] {
+    let key = ((r as usize) << 16) | ((g as usize) << 8) | b as usize;
+
+    match buf[key] {
         Some(k) => k,
         _ => {
             let mut best = 0_u8;
@@ -417,7 +417,7 @@ fn closest(buf: &mut Closest, mut color: (u16, u16, u16, u16), pal: &[RGBA]) -> 
                 }
             });
 
-            buf[r as usize][g as usize][b as usize] = Some(best);
+            buf[key] = Some(best);
 
             best
         },
@@ -433,7 +433,7 @@ fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, _alpha: bool, pt: Palette, er
     let height = orig.len();
 
     // TODO alpha level
-    let mut buf: Closest = vec![vec![vec![None; 256]; 256]; 256];
+    let mut buf: Vec<Option<u8>> = vec![None; 256 * 256 * 256];
 
     let mut res = vec![vec![0_u8; width]; height];
 
@@ -444,7 +444,7 @@ fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, _alpha: bool, pt: Palette, er
             let b = orig[y][x].2;
             let a = orig[y][x].3;
 
-            let ndx = closest(&mut buf, (r, g, b, a), &pal[..]);
+            let ndx = closest(&mut buf[..], (r, g, b, a), &pal[..]);
 
             res[y][x] = ndx;
         });
