@@ -38,29 +38,21 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
     let mut back: Vec<Vec<(u16, u16, u16, u16)>> = if err_diff { vec![vec![(0, 0, 0, 0); width]; height] } else { vec![vec![]] };
 
     if alpha {
-        let mut res = zip(0 .. height, orig.iter()).map(|(y, line)| {
-            zip(0 .. width, line.iter()).map(|(x, (r, g, b, a))| {
-                let r0 = (*r as f32) * 0.299;
-                let g0 = (*g as f32) * 0.587;
-                let b0 = (*b as f32) * 0.114;
+        let res = if !err_diff {
+            orig.iter().map(|line| {
+                line.iter().map(|(r, g, b, a)| {
+                    let r0 = (*r as f32) * 0.299;
+                    let g0 = (*g as f32) * 0.587;
+                    let b0 = (*b as f32) * 0.114;
 
-                let v = (r0 + g0 + b0) / 65535.0;
-                let p = ((v * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16;
+                    let v = (r0 + g0 + b0) / 65535.0;
+                    let p = ((v * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16;
 
-                if err_diff {
-                    back[y][x] = (
-                        p << (16 - bits as u16),
-                        p << (16 - bits as u16),
-                        p << (16 - bits as u16),
-                        *a >> if bits == 8 { 8 } else { 0 }
-                    )
-                }
-
-                (p, *a >> if bits == 8 { 8 } else { 0 })
+                    (p, *a >> if bits == 8 { 8 } else { 0 })
+                }).collect()
             }).collect()
-        }).collect();
-
-        if err_diff {
+        }
+        else {
             (0 .. height).for_each(|y| {
                 (0 .. width).for_each(|x| {
                     let (r, g, b, a) = orig[y][x];
@@ -72,7 +64,7 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
                     let v = r0 + g0 + b0;
                     let p = v as u16;
 
-                    let rev = back[y][x].0;
+                    let rev = (back[y][x].0 >> (16_i32 - bits as i32)) << (16_i32 - bits as i32);
                     let err_p: i32 = p as i32 - rev as i32;
                     let err_a: i32 = 0;
 
@@ -92,16 +84,16 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
                     }
 
                     let p = (back[y][x].0 >> (16_u16 - bits as u16)) << (16_u16 - bits as u16);
-                    back[y][x] = ( p, p, p, a >> (16_u16 - bits as u16));
+                    back[y][x] = ( p, p, p, a);
                 });
             });
 
-            res = back.iter().map(|line| {
+            back.iter().map(|line| {
                 line.iter().map(|(r, _g, _b, a)| {
-                    (*r >> (16_u16 - bits as u16), *a)
+                    (*r >> (16_u16 - bits as u16), *a >> if bits == 8 { 8 } else { 0 })
                 }).collect()
-            }).collect();
-        }
+            }).collect()
+        };
 
         ImageData::GRAYA(vec![res], gs)
     }
@@ -143,7 +135,6 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
                     let v = r0 + g0 + b0;
                     let p = v as u16;
 
-                    //let rev = (back[y][x].0 as i32) << (16_i32 - bits as i32);
                     let rev = (back[y][x].0 >> (16_i32 - bits as i32)) << (16_i32 - bits as i32);
                     let err_p: i32 = p as i32 - rev as i32;
                     let err_a: i32 = 0;
@@ -151,7 +142,7 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
                     let err = (err_p, err_p, err_p, err_a);
 
                     if x + 1 < width {
-                        add_frac_clamp(&mut back[y][x + 1], err, 7, 16, 16);// TODO last arg out
+                        add_frac_clamp(&mut back[y][x + 1], err, 7, 16, 16);
                     }
                     if x > 1 && y + 1 < height {
                         add_frac_clamp(&mut back[y + 1][x - 1], err, 3, 16, 16);
@@ -254,7 +245,7 @@ impl Qtz {
             _ => panic!("bad call of elect_qtz (c={c})")
         };
 
-        //output.sort(); // TODO rug it out - order by r / g / b
+        output.shrink_to_fit();
 
         self.memo.insert(key, output.clone());
 
@@ -650,17 +641,17 @@ mod tests {
             //ColorType::RGB16, // remove alpha
             //ColorType::RGBA,
             //ColorType::RGB,
-            //ColorType::GRAYA(Grayscale::G16),
-            //ColorType::GRAYA(Grayscale::G8),
-            //ColorType::GRAY(Grayscale::G16),
-            //ColorType::GRAY(Grayscale::G8),
+            ColorType::GRAYA(Grayscale::G16),
+            ColorType::GRAYA(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G16),
+            ColorType::GRAY(Grayscale::G8),
             //ColorType::GRAY(Grayscale::G4),
             //ColorType::GRAY(Grayscale::G2),
             //ColorType::GRAY(Grayscale::G1),
-            ColorType::NDX(Palette::P1),
-            ColorType::NDX(Palette::P2),
-            ColorType::NDX(Palette::P4),
-            ColorType::NDX(Palette::P8),
+            //ColorType::NDX(Palette::P1),
+            //ColorType::NDX(Palette::P2),
+            //ColorType::NDX(Palette::P4),
+            //ColorType::NDX(Palette::P8),
         ];
 
         let orig = read_png(ORIG).unwrap();
@@ -682,17 +673,17 @@ mod tests {
             //ColorType::RGB16, // remove alpha
             //ColorType::RGBA,
             //ColorType::RGB,
-            //ColorType::GRAYA(Grayscale::G16),
-            //ColorType::GRAYA(Grayscale::G8),
-            //ColorType::GRAY(Grayscale::G16),
-            //ColorType::GRAY(Grayscale::G8),
+            ColorType::GRAYA(Grayscale::G16),
+            ColorType::GRAYA(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G16),
+            ColorType::GRAY(Grayscale::G8),
             //ColorType::GRAY(Grayscale::G4),
             //ColorType::GRAY(Grayscale::G2),
             //ColorType::GRAY(Grayscale::G1),
-            ColorType::NDX(Palette::P1),
-            ColorType::NDX(Palette::P2),
-            ColorType::NDX(Palette::P4),
-            ColorType::NDX(Palette::P8),
+            //ColorType::NDX(Palette::P1),
+            //ColorType::NDX(Palette::P2),
+            //ColorType::NDX(Palette::P4),
+            //ColorType::NDX(Palette::P8),
         ];
 
         let orig = read_png(ORIG).unwrap();
