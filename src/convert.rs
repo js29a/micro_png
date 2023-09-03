@@ -183,7 +183,9 @@ type Cube = Vec<u64>;
 
 struct Qtz {
     cube: Cube,
-    memo: HashMap<u64, Vec<u16>>
+    memo: HashMap<u64, Vec<u16>>,
+    width: usize,
+    height: usize
 }
 
 impl Qtz {
@@ -195,6 +197,7 @@ impl Qtz {
         assert!(b.0 <= b.1);
 
         let mut output: Vec<u16> = Vec::new();
+        output.reserve(self.width * self.height);
 
         r.0 >>= 8;
         g.0 >>= 8;
@@ -217,24 +220,41 @@ impl Qtz {
             return v.clone();
         }
 
-        (r.0 ..= r.1).for_each(|rr| {
-            (g.0 ..= g.1).for_each(|gg| {
-                (b.0 ..= b.1).for_each(|bb| {
-                    let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
-                    let cnt = self.cube[offs as usize];
-
-                    //let cnt = self.cube[rr as usize][gg as usize][bb as usize];
-                    (0 .. cnt).for_each(|_| {
-                        match c {
-                            0 => output.push(rr << 8),
-                            1 => output.push(gg << 8),
-                            2 => output.push(bb << 8),
-                            _ => panic!("bad call of elect_qtz")
-                        }
+        match c {
+            0 =>
+                (r.0 ..= r.1).for_each(|rr| {
+                    (g.0 ..= g.1).for_each(|gg| {
+                        (b.0 ..= b.1).for_each(|bb| {
+                            let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
+                            let cnt = self.cube[offs as usize] as usize;
+                            (0 .. cnt).for_each(|_| output.push(rr << 8));
+                        });
                     });
-                });
-            });
-        });
+                }),
+            1 =>
+                (g.0 ..= g.1).for_each(|gg| {
+                    (r.0 ..= r.1).for_each(|rr| {
+                        (b.0 ..= b.1).for_each(|bb| {
+                            let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
+                            let cnt = self.cube[offs as usize] as usize;
+                            (0 .. cnt).for_each(|_| output.push(gg << 8));
+                        });
+                    });
+                }),
+            2 =>
+                (b.0 ..= b.1).for_each(|bb| {
+                    (r.0 ..= r.1).for_each(|rr| {
+                        (g.0 ..= g.1).for_each(|gg| {
+                            let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
+                            let cnt = self.cube[offs as usize] as usize;
+                            (0 .. cnt).for_each(|_| output.push(bb << 8));
+                        });
+                    });
+                }),
+            _ => panic!("bad call of elect_qtz (c={c})")
+        };
+
+        //output.sort(); // TODO rug it out - order by r / g / b
 
         self.memo.insert(key, output.clone());
 
@@ -283,21 +303,33 @@ fn elect_div(r: (u16, u16), g: (u16, u16), b: (u16, u16), qtz: &mut Qtz) -> usiz
     let vec_g = qtz.gen_vec(r, g, b, 1);
     let vec_b = qtz.gen_vec(r, g, b, 2);
 
-    let r_avg = (if vec_r.is_empty() { 0 } else { vec_r[0] as usize + vec_r[vec_r.len() - 1] as usize }) / 2;
-    let g_avg = (if vec_g.is_empty() { 0 } else { vec_g[0] as usize + vec_g[vec_g.len() - 1] as usize }) / 2;
-    let b_avg = (if vec_b.is_empty() { 0 } else { vec_b[0] as usize + vec_b[vec_b.len() - 1] as usize }) / 2;
+    //let r_mid = elect_qtz(r, g, b, 0, qtz) as usize;
+    //let g_mid = elect_qtz(r, g, b, 0, qtz) as usize;
+    //let b_mid = elect_qtz(r, g, b, 0, qtz) as usize;
 
-    let r_med = if vec_r.is_empty() { 0 } else { vec_r[vec_r.len() / 2] as usize };
-    let g_med = if vec_g.is_empty() { 0 } else { vec_g[vec_g.len() / 2] as usize };
-    let b_med = if vec_b.is_empty() { 0 } else { vec_b[vec_b.len() / 2] as usize };
+    //let r_avg = (if vec_r.is_empty() { 0 } else { vec_r[0] as usize + vec_r[vec_r.len() - 1] as usize }) / 2;
+    //let g_avg = (if vec_g.is_empty() { 0 } else { vec_g[0] as usize + vec_g[vec_g.len() - 1] as usize }) / 2;
+    //let b_avg = (if vec_b.is_empty() { 0 } else { vec_b[0] as usize + vec_b[vec_b.len() - 1] as usize }) / 2;
 
-    let r_dist = if r_med > r_avg { r_med - r_avg } else { r_avg - r_med };
-    let g_dist = if g_med > g_avg { g_med - g_avg } else { g_avg - g_med };
-    let b_dist = if b_med > b_avg { b_med - b_avg } else { b_avg - b_med };
+    //let r_med = if vec_r.is_empty() { 0 } else { vec_r[vec_r.len() / 2] as usize };
+    //let g_med = if vec_g.is_empty() { 0 } else { vec_g[vec_g.len() / 2] as usize };
+    //let b_med = if vec_b.is_empty() { 0 } else { vec_b[vec_b.len() / 2] as usize };
+
+    //let r_dist = if r_med > r_avg { r_med - r_avg } else { r_avg - r_med };
+    //let g_dist = if g_med > g_avg { g_med - g_avg } else { g_avg - g_med };
+    //let b_dist = if b_med > b_avg { b_med - b_avg } else { b_avg - b_med };
+
+    //let r_dist = if r_mid > r_avg { r_mid - r_avg } else { r_avg - r_mid };
+    //let g_dist = if g_mid > g_avg { g_mid - g_avg } else { g_avg - g_mid };
+    //let b_dist = if b_mid > b_avg { b_mid - b_avg } else { b_avg - b_mid };
 
     //let r_dist = r.1 - r.0;
     //let g_dist = g.1 - g.0;
     //let b_dist = b.1 - b.0;
+
+    let r_dist = if vec_r.is_empty() { 0 } else { vec_r[vec_r.len() - 1] - vec_r[0] };
+    let g_dist = if vec_g.is_empty() { 0 } else { vec_g[vec_g.len() - 1] - vec_g[0] };
+    let b_dist = if vec_b.is_empty() { 0 } else { vec_b[vec_b.len() - 1] - vec_b[0] };
 
     if r_dist >= g_dist && r_dist >= b_dist {
         0
@@ -368,7 +400,9 @@ fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
 
     let mut qtz = Qtz {
         cube,
-        memo: HashMap::new()
+        memo: HashMap::new(),
+        width,
+        height
     };
 
     //if bits >= 4 {
@@ -607,7 +641,7 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>, err_diff: bool) -> R
 mod tests {
     use super::*;
 
-    const ORIG: &str = "fixtures/ada.png";
+    const ORIG: &str = "fixtures/srce.png";
 
     #[test]
     pub fn test_convert() {
@@ -623,10 +657,10 @@ mod tests {
             //ColorType::GRAY(Grayscale::G4),
             //ColorType::GRAY(Grayscale::G2),
             //ColorType::GRAY(Grayscale::G1),
-            //ColorType::NDX(Palette::P1),
-            //ColorType::NDX(Palette::P2),
+            ColorType::NDX(Palette::P1),
+            ColorType::NDX(Palette::P2),
             ColorType::NDX(Palette::P4),
-            //ColorType::NDX(Palette::P8),
+            ColorType::NDX(Palette::P8),
         ];
 
         let orig = read_png(ORIG).unwrap();
@@ -655,10 +689,10 @@ mod tests {
             //ColorType::GRAY(Grayscale::G4),
             //ColorType::GRAY(Grayscale::G2),
             //ColorType::GRAY(Grayscale::G1),
-            //ColorType::NDX(Palette::P1),
-            //ColorType::NDX(Palette::P2),
+            ColorType::NDX(Palette::P1),
+            ColorType::NDX(Palette::P2),
             ColorType::NDX(Palette::P4),
-            //ColorType::NDX(Palette::P8),
+            ColorType::NDX(Palette::P8),
         ];
 
         let orig = read_png(ORIG).unwrap();
