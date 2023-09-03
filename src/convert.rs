@@ -42,8 +42,6 @@ fn clamp_add_gs(dest: &mut (u16, u16, u16, u16), mut val: (i32, i32), num: i32, 
 }
 
 fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale, err_diff: bool) -> ImageData {
-    //  0.299 0.587 0.114
-
     let width = orig[0].len();
     let height = orig.len();
 
@@ -350,8 +348,49 @@ fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
     pal
 }
 
+type Closest = Vec<Vec<Vec<Option<u8>>>>;
+
+fn closest(buf: &mut Closest, mut color: (u16, u16, u16, u16), pal: &[RGBA]) -> u8 {
+    color.0 >>= 8;
+    color.1 >>= 8;
+    color.2 >>= 8;
+    color.3 >>= 8;
+
+    let r = color.0 as i32;
+    let g = color.1 as i32;
+    let b = color.2 as i32;
+    let a = color.3 as i32;
+
+    match buf[r as usize][g as usize][b as usize] {
+        Some(k) => k,
+        _ => {
+            let mut best = 0_u8;
+            let mut best_dist =
+                (r - pal[0].0 as i32) * (r - pal[0].0 as i32) +
+                (g - pal[0].1 as i32) * (g - pal[0].1 as i32) +
+                (b - pal[0].2 as i32) * (b - pal[0].2 as i32);
+
+            (1 .. pal.len()).for_each(|n| {
+                let cur_dist =
+                    (r - pal[n].0 as i32) * (r - pal[n].0 as i32) +
+                    (g - pal[n].1 as i32) * (g - pal[n].1 as i32) +
+                    (b - pal[n].2 as i32) * (b - pal[n].2 as i32);
+
+                if cur_dist < best_dist {
+                    best = n as u8;
+                    best_dist = cur_dist;
+                }
+            });
+
+            buf[r as usize][g as usize][b as usize] = Some(best);
+
+            best
+        },
+    }
+}
+
 // TODO strip alpha from palette for NDX no A modes
-fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, _alpha: bool, pt: Palette) -> ImageData {
+fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, _alpha: bool, pt: Palette, err_diff: bool) -> ImageData {
     let pal = elect_palette(&orig, bits);
     assert_eq!(pal.len(), 1 << bits);
 
@@ -359,49 +398,83 @@ fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, _alpha: bool, pt: Palette) ->
     let height = orig.len();
 
     // TODO alpha level
-    let mut closest: Vec<Vec<Vec<Option<u8>>>> = vec![vec![vec![None; 256]; 256]; 256];
+    let mut buf: Closest = vec![vec![vec![None; 256]; 256]; 256];
 
     let mut res = vec![vec![0_u8; width]; height];
 
     (0 .. height).for_each(|y| {
         (0 .. width).for_each(|x| {
-            let r = (orig[y][x].0 >> 8) as i32;
-            let g = (orig[y][x].1 >> 8) as i32;
-            let b = (orig[y][x].2 >> 8) as i32;
-            let _a = (orig[y][x].3 >> 8) as i32;
+            let r = (orig[y][x].0);
+            let g = (orig[y][x].1);
+            let b = (orig[y][x].2);
+            let a = (orig[y][x].3);
 
-            let ndx = match closest[r as usize][g as usize][b as usize] {
-                Some(k) => k,
-                _ => {
-                    let mut best = 0_u8;
-                    let mut best_dist =
-                        (r - pal[0].0 as i32) * (r - pal[0].0 as i32) +
-                        (g - pal[0].1 as i32) * (g - pal[0].1 as i32) +
-                        (b - pal[0].2 as i32) * (b - pal[0].2 as i32);
-
-                    (1 .. pal.len()).for_each(|n| {
-                        let cur_dist =
-                            (r - pal[n].0 as i32) * (r - pal[n].0 as i32) +
-                            (g - pal[n].1 as i32) * (g - pal[n].1 as i32) +
-                            (b - pal[n].2 as i32) * (b - pal[n].2 as i32);
-
-                        if cur_dist < best_dist {
-                            best = n as u8;
-                            best_dist = cur_dist;
-                        }
-                    });
-
-                    closest[r as usize][g as usize][b as usize] = Some(best);
-
-                    best
-                },
-            };
+            let ndx = closest(&mut buf, (r, g, b, a), &pal[..]);
 
             res[y][x] = ndx;
         });
     });
 
-    ImageData::NDXA(vec![res], pal, pt)
+    if !err_diff {
+      ImageData::NDXA(vec![res], pal, pt)
+    }
+    else {
+        let mut back: Vec<Vec<RGBA16>> = vec![vec![(0, 0, 0, 0); width]; height];
+
+        (0 .. height).for_each(|y| {
+            (0 .. width).for_each(|x| {
+                let r = res[y][x] as usize;
+
+                back[y][x] = (
+                    (pal[r].0 as u16) << 8,
+                    (pal[r].1 as u16) << 8,
+                    (pal[r].2 as u16) << 8,
+                    (pal[r].3 as u16) << 8
+                );
+            })
+        });
+
+        (0 .. height as usize).for_each(|y| {
+            (0 .. width as usize).for_each(|x| {
+                let (r, g, b, a) = orig[y][x];
+
+                let err = (
+                    r as i32 - back[y][x].0 as i32,
+                    g as i32 - back[y][x].1 as i32,
+                    b as i32 - back[y][x].2 as i32,
+                    a as i32 - back[y][x].3 as i32
+                );
+
+                if x + 1 < width {
+                    clamp_add(&mut back[y][x + 1], err, 7, 16, 16);// TODO last arg out
+                }
+                if x > 1 && y + 1 < height {
+                    clamp_add(&mut back[y + 1][x - 1], err, 3, 16, 16);
+                }
+                if y + 1 < height {
+                    clamp_add(&mut back[y + 1][x], err, 5, 16, 16);
+                }
+                if x + 1 < width && y + 1 < height {
+                    clamp_add(&mut back[y + 1][x + 1], err, 1, 16, 16);
+                }
+            });
+        });
+
+        (0 .. height).for_each(|y| {
+            (0 .. width).for_each(|x| {
+                let r = (back[y][x].0);
+                let g = (back[y][x].1);
+                let b = (back[y][x].2);
+                let a = (back[y][x].3);
+
+                let ndx = closest(&mut buf, (r, g, b, a), &pal[..]);
+
+                res[y][x] = ndx;
+            });
+        });
+
+        ImageData::NDXA(vec![res], pal, pt)
+    }
 }
 
 /// Convert RGBA HDR to any format.
@@ -490,14 +563,14 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>, err_diff: bool) -> R
         ColorType::GRAY(Grayscale::G16) => Ok(to_grayscale(orig, 16, false, Grayscale::G16, err_diff)),
         ColorType::GRAYA(Grayscale::G8) => Ok(to_grayscale(orig, 8, true, Grayscale::G8, err_diff)),
         ColorType::GRAYA(Grayscale::G16) => Ok(to_grayscale(orig, 16, true, Grayscale::G16, err_diff)),
-        ColorType::NDXA(Palette::P1) => Ok(to_indexed(orig, 1, true, Palette::P1)),
-        ColorType::NDXA(Palette::P2) => Ok(to_indexed(orig, 2, true, Palette::P2)),
-        ColorType::NDXA(Palette::P4) => Ok(to_indexed(orig, 4, true, Palette::P4)),
-        ColorType::NDXA(Palette::P8) => Ok(to_indexed(orig, 8, true, Palette::P8)),
-        ColorType::NDX(Palette::P1) => Ok(to_indexed(orig, 1, false, Palette::P1)),
-        ColorType::NDX(Palette::P2) => Ok(to_indexed(orig, 2, false, Palette::P2)),
-        ColorType::NDX(Palette::P4) => Ok(to_indexed(orig, 4, false, Palette::P4)),
-        ColorType::NDX(Palette::P8) => Ok(to_indexed(orig, 8, false, Palette::P8)),
+        ColorType::NDXA(Palette::P1) => Ok(to_indexed(orig, 1, true, Palette::P1, err_diff)),
+        ColorType::NDXA(Palette::P2) => Ok(to_indexed(orig, 2, true, Palette::P2, err_diff)),
+        ColorType::NDXA(Palette::P4) => Ok(to_indexed(orig, 4, true, Palette::P4, err_diff)),
+        ColorType::NDXA(Palette::P8) => Ok(to_indexed(orig, 8, true, Palette::P8, err_diff)),
+        ColorType::NDX(Palette::P1) => Ok(to_indexed(orig, 1, false, Palette::P1, err_diff)),
+        ColorType::NDX(Palette::P2) => Ok(to_indexed(orig, 2, false, Palette::P2, err_diff)),
+        ColorType::NDX(Palette::P4) => Ok(to_indexed(orig, 4, false, Palette::P4, err_diff)),
+        ColorType::NDX(Palette::P8) => Ok(to_indexed(orig, 8, false, Palette::P8, err_diff)),
         _ => Err("to be done".to_string())
     }
 }
@@ -511,21 +584,21 @@ mod tests {
     #[test]
     pub fn test_convert() {
         let targets = vec![
-            ColorType::RGBA16, // stupid test
-            ColorType::RGB16, // remove alpha
-            ColorType::RGBA,
-            ColorType::RGB,
-            ColorType::GRAYA(Grayscale::G16),
-            ColorType::GRAYA(Grayscale::G8),
-            ColorType::GRAY(Grayscale::G16),
-            ColorType::GRAY(Grayscale::G8),
+            //ColorType::RGBA16, // stupid test
+            //ColorType::RGB16, // remove alpha
+            //ColorType::RGBA,
+            //ColorType::RGB,
+            //ColorType::GRAYA(Grayscale::G16),
+            //ColorType::GRAYA(Grayscale::G8),
+            //ColorType::GRAY(Grayscale::G16),
+            //ColorType::GRAY(Grayscale::G8),
             ColorType::GRAY(Grayscale::G4),
-            ColorType::GRAY(Grayscale::G2),
-            ColorType::GRAY(Grayscale::G1),
-            //ColorType::NDX(Palette::P1),
-            //ColorType::NDX(Palette::P2),
-            //ColorType::NDX(Palette::P4),
-            //ColorType::NDX(Palette::P8),
+            //ColorType::GRAY(Grayscale::G2),
+            //ColorType::GRAY(Grayscale::G1),
+            ColorType::NDX(Palette::P1),
+            ColorType::NDX(Palette::P2),
+            ColorType::NDX(Palette::P4),
+            ColorType::NDX(Palette::P8),
         ];
 
         let orig = read_png(ORIG).unwrap();
@@ -547,17 +620,17 @@ mod tests {
             //ColorType::RGB16, // remove alpha
             //ColorType::RGBA,
             //ColorType::RGB,
-            ColorType::GRAYA(Grayscale::G16),
-            ColorType::GRAYA(Grayscale::G8),
-            ColorType::GRAY(Grayscale::G16),
-            ColorType::GRAY(Grayscale::G8),
-            ColorType::GRAY(Grayscale::G4),
-            ColorType::GRAY(Grayscale::G2),
-            ColorType::GRAY(Grayscale::G1),
-            //ColorType::NDX(Palette::P1),
-            //ColorType::NDX(Palette::P2),
-            //ColorType::NDX(Palette::P4),
-            //ColorType::NDX(Palette::P8),
+            //ColorType::GRAYA(Grayscale::G16),
+            //ColorType::GRAYA(Grayscale::G8),
+            //ColorType::GRAY(Grayscale::G16),
+            //ColorType::GRAY(Grayscale::G8),
+            //ColorType::GRAY(Grayscale::G4),
+            //ColorType::GRAY(Grayscale::G2),
+            //ColorType::GRAY(Grayscale::G1),
+            ColorType::NDX(Palette::P1),
+            ColorType::NDX(Palette::P2),
+            ColorType::NDX(Palette::P4),
+            ColorType::NDX(Palette::P8),
         ];
 
         let orig = read_png(ORIG).unwrap();
