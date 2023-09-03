@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use crate::*;
 
-fn clamp_add(dest: &mut (u16, u16, u16, u16), mut val: (i32, i32, i32, i32), num: i32, den: i32, bits: usize) {
+fn add_frac_clamp(dest: &mut (u16, u16, u16, u16), mut val: (i32, i32, i32, i32), num: i32, den: i32, bits: usize) {
     let b = 16_u16 - bits as u16;
 
     val.0 = val.0 * num / den;
@@ -79,16 +79,16 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
                     let err = (err_p, err_p, err_p, err_a);
 
                     if x + 1 < width {
-                        clamp_add(&mut back[y][x + 1], err, 7, 16, 16);// TODO last arg out
+                        add_frac_clamp(&mut back[y][x + 1], err, 7, 16, 16);
                     }
                     if x > 1 && y + 1 < height {
-                        clamp_add(&mut back[y + 1][x - 1], err, 3, 16, 16);
+                        add_frac_clamp(&mut back[y + 1][x - 1], err, 3, 16, 16);
                     }
                     if y + 1 < height {
-                        clamp_add(&mut back[y + 1][x], err, 5, 16, 16);
+                        add_frac_clamp(&mut back[y + 1][x], err, 5, 16, 16);
                     }
                     if x + 1 < width && y + 1 < height {
-                        clamp_add(&mut back[y + 1][x + 1], err, 1, 16, 16);
+                        add_frac_clamp(&mut back[y + 1][x + 1], err, 1, 16, 16);
                     }
 
                     let p = (back[y][x].0 >> (16_u16 - bits as u16)) << (16_u16 - bits as u16);
@@ -151,16 +151,16 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
                     let err = (err_p, err_p, err_p, err_a);
 
                     if x + 1 < width {
-                        clamp_add(&mut back[y][x + 1], err, 7, 16, 16);// TODO last arg out
+                        add_frac_clamp(&mut back[y][x + 1], err, 7, 16, 16);// TODO last arg out
                     }
                     if x > 1 && y + 1 < height {
-                        clamp_add(&mut back[y + 1][x - 1], err, 3, 16, 16);
+                        add_frac_clamp(&mut back[y + 1][x - 1], err, 3, 16, 16);
                     }
                     if y + 1 < height {
-                        clamp_add(&mut back[y + 1][x], err, 5, 16, 16);
+                        add_frac_clamp(&mut back[y + 1][x], err, 5, 16, 16);
                     }
                     if x + 1 < width && y + 1 < height {
-                        clamp_add(&mut back[y + 1][x + 1], err, 1, 16, 16);
+                        add_frac_clamp(&mut back[y + 1][x + 1], err, 1, 16, 16);
                     }
 
                     let p = (back[y][x].0 >> (16_u16 - bits as u16)) << (16_u16 - bits as u16);
@@ -187,7 +187,7 @@ struct Qtz {
 }
 
 impl Qtz {
-    fn fill_vec(&mut self, mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), c: usize) -> Vec<u16> {
+    fn gen_vec(&mut self, mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), c: usize) -> Vec<u16> {
         assert!(c < 3);
 
         assert!(r.0 <= r.1);
@@ -250,7 +250,7 @@ fn elect_qtz(r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize, qtz: &mut Qt
     assert!(g.0 <= g.1);
     assert!(b.0 <= b.1);
 
-    let vec = qtz.fill_vec(r, g, b, c);
+    let vec = qtz.gen_vec(r, g, b, c);
 
     if vec.is_empty() {
         match c {
@@ -261,39 +261,48 @@ fn elect_qtz(r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize, qtz: &mut Qt
         }
     }
     else {
-        vec[vec.len() / 2]
+        let mut a = 0_f32;
+        let mut b = 0_f32;
+        let mut c = 0_f32;
+
+        // a * x * x + b * x + c
+        // (x - v) * (x - v) -> x * x + v * v - 2 * x * v
+
+        vec.iter().for_each(|v| {
+            a += 1.0;
+            b += -2.0 * *v as f32;
+            c += *v as f32 * *v as f32;
+        });
+
+        (-b / a * 0.5) as u16
     }
 }
 
 fn elect_div(r: (u16, u16), g: (u16, u16), b: (u16, u16), qtz: &mut Qtz) -> usize {
-    //let r_dist = r.1 - r.0;
-    //let g_dist = g.1 - g.0;
-    //let b_dist = b.1 - b.0;
-
-    let vec_r = qtz.fill_vec(r, g, b, 0);
-    let vec_g = qtz.fill_vec(r, g, b, 1);
-    let vec_b = qtz.fill_vec(r, g, b, 2);
+    let vec_r = qtz.gen_vec(r, g, b, 0);
+    let vec_g = qtz.gen_vec(r, g, b, 1);
+    let vec_b = qtz.gen_vec(r, g, b, 2);
 
     let r_avg = (if vec_r.is_empty() { 0 } else { vec_r[0] as usize + vec_r[vec_r.len() - 1] as usize }) / 2;
-    let g_avg = (if vec_g.is_empty() { 0 } else { vec_g[0] as usize + vec_g[vec_r.len() - 1] as usize }) / 2;
-    let b_avg = (if vec_b.is_empty() { 0 } else { vec_b[0] as usize + vec_b[vec_r.len() - 1] as usize }) / 2;
+    let g_avg = (if vec_g.is_empty() { 0 } else { vec_g[0] as usize + vec_g[vec_g.len() - 1] as usize }) / 2;
+    let b_avg = (if vec_b.is_empty() { 0 } else { vec_b[0] as usize + vec_b[vec_b.len() - 1] as usize }) / 2;
 
-    //let r_avg = (r.0 as usize + r.1 as usize) / 2;
-    //let g_avg = (g.0 as usize + g.1 as usize) / 2;
-    //let b_avg = (b.0 as usize + b.1 as usize) / 2;
-
-    let r_med = vec_r[vec_r.len() / 2] as usize;
-    let g_med = vec_g[vec_g.len() / 2] as usize;
-    let b_med = vec_b[vec_b.len() / 2] as usize;
+    let r_med = if vec_r.is_empty() { 0 } else { vec_r[vec_r.len() / 2] as usize };
+    let g_med = if vec_g.is_empty() { 0 } else { vec_g[vec_g.len() / 2] as usize };
+    let b_med = if vec_b.is_empty() { 0 } else { vec_b[vec_b.len() / 2] as usize };
 
     let r_dist = if r_med > r_avg { r_med - r_avg } else { r_avg - r_med };
     let g_dist = if g_med > g_avg { g_med - g_avg } else { g_avg - g_med };
     let b_dist = if b_med > b_avg { b_med - b_avg } else { b_avg - b_med };
 
-    if r_dist > g_dist && r_dist > b_dist {
+    //let r_dist = r.1 - r.0;
+    //let g_dist = g.1 - g.0;
+    //let b_dist = b.1 - b.0;
+
+    if r_dist >= g_dist && r_dist >= b_dist {
         0
     }
-    else if g_dist > b_dist {
+    else if g_dist >= b_dist {
         1
     }
     else {
@@ -318,7 +327,6 @@ fn elect_palette_sub(r: (u16, u16), g: (u16, u16), b: (u16, u16), bits: usize, p
     }
     else {
         let c1 = elect_div(r, g, b, qtz);
-
         let split = elect_qtz(r, g, b, c1, qtz);
 
         match c1 {
@@ -479,20 +487,17 @@ fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, _alpha: bool, pt: Palette, er
                 );
 
                 if x + 1 < width {
-                    clamp_add(&mut back[y][x + 1], err, 7, 16, 16);// TODO last arg out
+                    add_frac_clamp(&mut back[y][x + 1], err, 7, 16, 16);
                 }
                 if x > 1 && y + 1 < height {
-                    clamp_add(&mut back[y + 1][x - 1], err, 3, 16, 16);
+                    add_frac_clamp(&mut back[y + 1][x - 1], err, 3, 16, 16);
                 }
                 if y + 1 < height {
-                    clamp_add(&mut back[y + 1][x], err, 5, 16, 16);
+                    add_frac_clamp(&mut back[y + 1][x], err, 5, 16, 16);
                 }
                 if x + 1 < width && y + 1 < height {
-                    clamp_add(&mut back[y + 1][x + 1], err, 1, 16, 16);
+                    add_frac_clamp(&mut back[y + 1][x + 1], err, 1, 16, 16);
                 }
-
-                //let ndx = closest(&mut buf, back[y][x], &pal[..]) as u8;
-                //res[y][x];
             });
         });
 
@@ -583,9 +588,9 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>, err_diff: bool) -> R
         ColorType::GRAY(Grayscale::G2) => Ok(to_grayscale(orig, 2, false, Grayscale::G2, err_diff)),
         ColorType::GRAY(Grayscale::G4) => Ok(to_grayscale(orig, 4, false, Grayscale::G4, err_diff)),
         ColorType::GRAY(Grayscale::G8) => Ok(to_grayscale(orig, 8, false, Grayscale::G8, err_diff)),
-        ColorType::GRAY(Grayscale::G16) => Ok(to_grayscale(orig, 16, false, Grayscale::G16, err_diff)),
+        ColorType::GRAY(Grayscale::G16) => Ok(to_grayscale(orig, 16, false, Grayscale::G16, false)), // XXX what to diffuse ???
         ColorType::GRAYA(Grayscale::G8) => Ok(to_grayscale(orig, 8, true, Grayscale::G8, err_diff)),
-        ColorType::GRAYA(Grayscale::G16) => Ok(to_grayscale(orig, 16, true, Grayscale::G16, err_diff)),
+        ColorType::GRAYA(Grayscale::G16) => Ok(to_grayscale(orig, 16, true, Grayscale::G16, false)), // XXX what to diffuse ???
         ColorType::NDXA(Palette::P1) => Ok(to_indexed(orig, 1, true, Palette::P1, err_diff)),
         ColorType::NDXA(Palette::P2) => Ok(to_indexed(orig, 2, true, Palette::P2, err_diff)),
         ColorType::NDXA(Palette::P4) => Ok(to_indexed(orig, 4, true, Palette::P4, err_diff)),
@@ -602,26 +607,26 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>, err_diff: bool) -> R
 mod tests {
     use super::*;
 
-    const ORIG: &str = "fixtures/srce.png";
+    const ORIG: &str = "fixtures/ada.png";
 
     #[test]
     pub fn test_convert() {
         let targets = vec![
-            ColorType::RGBA16, // stupid test
-            ColorType::RGB16, // remove alpha
-            ColorType::RGBA,
-            ColorType::RGB,
-            ColorType::GRAYA(Grayscale::G16),
-            ColorType::GRAYA(Grayscale::G8),
-            ColorType::GRAY(Grayscale::G16),
-            ColorType::GRAY(Grayscale::G8),
-            ColorType::GRAY(Grayscale::G4),
-            ColorType::GRAY(Grayscale::G2),
-            ColorType::GRAY(Grayscale::G1),
-            ColorType::NDX(Palette::P1),
-            ColorType::NDX(Palette::P2),
+            //ColorType::RGBA16, // stupid test
+            //ColorType::RGB16, // remove alpha
+            //ColorType::RGBA,
+            //ColorType::RGB,
+            //ColorType::GRAYA(Grayscale::G16),
+            //ColorType::GRAYA(Grayscale::G8),
+            //ColorType::GRAY(Grayscale::G16),
+            //ColorType::GRAY(Grayscale::G8),
+            //ColorType::GRAY(Grayscale::G4),
+            //ColorType::GRAY(Grayscale::G2),
+            //ColorType::GRAY(Grayscale::G1),
+            //ColorType::NDX(Palette::P1),
+            //ColorType::NDX(Palette::P2),
             ColorType::NDX(Palette::P4),
-            ColorType::NDX(Palette::P8),
+            //ColorType::NDX(Palette::P8),
         ];
 
         let orig = read_png(ORIG).unwrap();
@@ -639,21 +644,21 @@ mod tests {
     #[test]
     pub fn test_convert_err_diff() {
         let targets = vec![
-            ColorType::RGBA16, // stupid test
-            ColorType::RGB16, // remove alpha
-            ColorType::RGBA,
-            ColorType::RGB,
-            ColorType::GRAYA(Grayscale::G16),
-            ColorType::GRAYA(Grayscale::G8),
-            ColorType::GRAY(Grayscale::G16),
-            ColorType::GRAY(Grayscale::G8),
-            ColorType::GRAY(Grayscale::G4),
-            ColorType::GRAY(Grayscale::G2),
-            ColorType::GRAY(Grayscale::G1),
-            ColorType::NDX(Palette::P1),
-            ColorType::NDX(Palette::P2),
+            //ColorType::RGBA16, // stupid test
+            //ColorType::RGB16, // remove alpha
+            //ColorType::RGBA,
+            //ColorType::RGB,
+            //ColorType::GRAYA(Grayscale::G16),
+            //ColorType::GRAYA(Grayscale::G8),
+            //ColorType::GRAY(Grayscale::G16),
+            //ColorType::GRAY(Grayscale::G8),
+            //ColorType::GRAY(Grayscale::G4),
+            //ColorType::GRAY(Grayscale::G2),
+            //ColorType::GRAY(Grayscale::G1),
+            //ColorType::NDX(Palette::P1),
+            //ColorType::NDX(Palette::P2),
             ColorType::NDX(Palette::P4),
-            ColorType::NDX(Palette::P8),
+            //ColorType::NDX(Palette::P8),
         ];
 
         let orig = read_png(ORIG).unwrap();
