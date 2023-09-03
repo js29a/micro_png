@@ -2,33 +2,112 @@
 ///
 /// Format conversion utilities.
 
+use std::iter::zip;
 use std::collections::HashMap;
 
 use crate::*;
 
-fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale) -> ImageData {
+fn clamp_add(dest: &mut (u16, u16, u16, u16), mut val: (i32, i32, i32, i32), num: i32, den: i32) {
+    val.0 = (val.0 as i64 * num as i64 / den as i64) as i32;
+    val.1 = (val.1 as i64 * num as i64 / den as i64) as i32;
+    val.2 = (val.2 as i64 * num as i64 / den as i64) as i32;
+    val.3 = (val.3 as i64 * num as i64 / den as i64) as i32;
+
+    dest.0 = (dest.0 as i32 + val.0).clamp(0, 0xffff) as u16;
+    dest.1 = (dest.1 as i32 + val.0).clamp(0, 0xffff) as u16;
+    dest.2 = (dest.2 as i32 + val.0).clamp(0, 0xffff) as u16;
+    dest.3 = (dest.3 as i32 + val.0).clamp(0, 0xffff) as u16;
+}
+
+fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale, err_diff: bool) -> ImageData {
     //  0.299 0.587 0.114
+
+    let width = orig[0].len();
+    let height = orig.len();
+
+    let mut back: Vec<Vec<RGBA16>> = if err_diff { vec![vec![(0, 0, 0, 0); width]; height] } else { vec![vec![]] };
 
     if alpha {
         let res = orig.iter().map(|line| {
             line.iter().map(|(r, g, b, a)| {
-                let y = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
-                (
-                    ((y * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16,
-                    *a / ( if bits == 8  { 256 } else { 1 })
-                )
+                let v = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
+                let p = ((v * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16;
+                //(
+                    //p,
+                    //*a / ( if bits == 8  { 256 } else { 1 })
+                //);
+
+                //if err_diff {
+                    //back[y][x] = (
+                        //p,
+                        //p,
+                        //p,
+                        //*a / ( if bits == 8  { 256 } else { 1 })
+                    //)
+                //}
+
+                (p, *a / ( if bits == 8  { 256 } else { 1 }))
             }).collect()
         }).collect();
 
         ImageData::GRAYA(vec![res], gs)
     }
     else {
-        let res = orig.iter().map(|line| {
-            line.iter().map(|(r, g, b, _a)| {
-                let y = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
-                ((y * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16
+        let mut res = zip(0 .. height as usize, orig.iter()).map(|(y, line)| {
+            zip(0 .. width as usize, line.iter()).map(|(x, (r, g, b, _a))| {
+                let v = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
+                let p = ((v * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16;
+
+                if err_diff {
+                    back[y][x] = (
+                        p,
+                        p,
+                        p,
+                        0xffff
+                    )
+                }
+
+                p
             }).collect()
         }).collect();
+
+        if err_diff {
+            (0 .. height as usize).for_each(|y| {
+                (0 .. width as usize).for_each(|x| {
+                    let err_r: i32 = orig[y][x].0 as i32 - back[y][x].0 as i32;
+                    let err_g: i32 = orig[y][x].1 as i32 - back[y][x].1 as i32;
+                    let err_b: i32 = orig[y][x].2 as i32 - back[y][x].2 as i32;
+                    let err_a: i32 = orig[y][x].3 as i32 - back[y][x].3 as i32;
+
+                    let err = (err_r, err_g, err_b, err_a);
+
+                    if x + 1 < width {// 7 / 16
+                        clamp_add(&mut back[y][x + 1], err, 7, 16);
+                    }
+                    if x > 1 && y + 1 < height {// 3 / 16
+                        clamp_add(&mut back[y + 1][x - 1], err, 3, 16);
+                        //back[y + 1][x - 1] = 
+                    }
+                    if y + 1 < height {// 5 / 16
+                        clamp_add(&mut back[y + 1][x], err, 5, 16);
+                        //back[y + 1][x] =
+                    }
+                    if x + 1 < width && y + 1 < height {// 1 / 16
+                        clamp_add(&mut back[y + 1][x + 1], err, 1, 16);
+                        //back[y + 1][x + 1] = 
+                    }
+                });
+            });
+
+            res = back.iter().map(|line| {
+                line.iter().map(|(r, g, b, _a)| {
+                    let y = ((*r as f32) * 0.299 + (*g as f32) * 0.587 + (*b as f32) * 0.114) / 65535.0;
+                    let p = ((y * ((1 << bits) as f32)) as u32).clamp(0, (1 << bits) - 1) as u16;
+
+                    p
+                }).collect()
+            }).collect();
+        }
 
         ImageData::GRAY(vec![res], gs)
     }
@@ -256,7 +335,7 @@ fn to_indexed(orig: Vec<Vec<RGBA16>>, bits: usize, _alpha: bool, pt: Palette) ->
 }
 
 /// Convert RGBA HDR to any format.
-pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData, String> {
+pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>, err_diff: bool) -> Result<ImageData, String> {
     // TODO verify if dims ok (?)
 
     if orig.is_empty() {
@@ -286,7 +365,7 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData,
             Ok(
                 ImageData::RGBA16(vec![orig])
             ),
-        ColorType::RGB16 => {
+        ColorType::RGB16 => { // TODO err diff
             Ok(
                 ImageData::RGB16(
                     vec![
@@ -299,7 +378,7 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData,
                 )
             )
         },
-        ColorType::RGBA => {
+        ColorType::RGBA => { // TODO err-diff
             Ok(
                 ImageData::RGBA(
                     vec![
@@ -317,7 +396,7 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData,
                 )
             )
         },
-        ColorType::RGB => {
+        ColorType::RGB => { // TODO err-diff
             Ok(
                 ImageData::RGB(
                     vec![
@@ -334,13 +413,13 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>) -> Result<ImageData,
                 )
             )
         },
-        ColorType::GRAY(Grayscale::G1) => Ok(to_grayscale(orig, 1, false, Grayscale::G1)),
-        ColorType::GRAY(Grayscale::G2) => Ok(to_grayscale(orig, 2, false, Grayscale::G2)),
-        ColorType::GRAY(Grayscale::G4) => Ok(to_grayscale(orig, 4, false, Grayscale::G4)),
-        ColorType::GRAY(Grayscale::G8) => Ok(to_grayscale(orig, 8, false, Grayscale::G8)),
-        ColorType::GRAY(Grayscale::G16) => Ok(to_grayscale(orig, 16, false, Grayscale::G16)),
-        ColorType::GRAYA(Grayscale::G8) => Ok(to_grayscale(orig, 8, true, Grayscale::G8)),
-        ColorType::GRAYA(Grayscale::G16) => Ok(to_grayscale(orig, 16, true, Grayscale::G16)),
+        ColorType::GRAY(Grayscale::G1) => Ok(to_grayscale(orig, 1, false, Grayscale::G1, err_diff)),
+        ColorType::GRAY(Grayscale::G2) => Ok(to_grayscale(orig, 2, false, Grayscale::G2, err_diff)),
+        ColorType::GRAY(Grayscale::G4) => Ok(to_grayscale(orig, 4, false, Grayscale::G4, err_diff)),
+        ColorType::GRAY(Grayscale::G8) => Ok(to_grayscale(orig, 8, false, Grayscale::G8, err_diff)),
+        ColorType::GRAY(Grayscale::G16) => Ok(to_grayscale(orig, 16, false, Grayscale::G16, err_diff)),
+        ColorType::GRAYA(Grayscale::G8) => Ok(to_grayscale(orig, 8, true, Grayscale::G8, err_diff)),
+        ColorType::GRAYA(Grayscale::G16) => Ok(to_grayscale(orig, 16, true, Grayscale::G16, err_diff)),
         ColorType::NDXA(Palette::P1) => Ok(to_indexed(orig, 1, true, Palette::P1)),
         ColorType::NDXA(Palette::P2) => Ok(to_indexed(orig, 2, true, Palette::P2)),
         ColorType::NDXA(Palette::P4) => Ok(to_indexed(orig, 4, true, Palette::P4)),
@@ -373,19 +452,51 @@ mod tests {
             ColorType::GRAY(Grayscale::G4),
             ColorType::GRAY(Grayscale::G2),
             ColorType::GRAY(Grayscale::G1),
-            ColorType::NDX(Palette::P1),
-            ColorType::NDX(Palette::P2),
-            ColorType::NDX(Palette::P4),
-            ColorType::NDX(Palette::P8),
+            //ColorType::NDX(Palette::P1),
+            //ColorType::NDX(Palette::P2),
+            //ColorType::NDX(Palette::P4),
+            //ColorType::NDX(Palette::P8),
         ];
 
         let orig = read_png(ORIG).unwrap();
 
         targets.iter().for_each(|target| {
-            let data = convert_hdr(*target, orig.data()).unwrap();
+            let data = convert_hdr(*target, orig.data(), false).unwrap();
 
             build_apng(
                 APNGBuilder::new(format!("tmp/test-conv-{target:?}.png").as_str(), data)
+                    .set_filter(Filter::Paeth)
+            ).unwrap();
+        });
+    }
+
+    #[test]
+    pub fn test_convert_err_diff() {
+        let targets = vec![
+            //ColorType::RGBA16, // stupid test
+            //ColorType::RGB16, // remove alpha
+            //ColorType::RGBA,
+            //ColorType::RGB,
+            //ColorType::GRAYA(Grayscale::G16),
+            //ColorType::GRAYA(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G16),
+            ColorType::GRAY(Grayscale::G8),
+            ColorType::GRAY(Grayscale::G4),
+            ColorType::GRAY(Grayscale::G2),
+            ColorType::GRAY(Grayscale::G1),
+            //ColorType::NDX(Palette::P1),
+            //ColorType::NDX(Palette::P2),
+            //ColorType::NDX(Palette::P4),
+            //ColorType::NDX(Palette::P8),
+        ];
+
+        let orig = read_png(ORIG).unwrap();
+
+        targets.iter().for_each(|target| {
+            let data = convert_hdr(*target, orig.data(), true).unwrap();
+
+            build_apng(
+                APNGBuilder::new(format!("tmp/test-conv-{target:?}-err-diff.png").as_str(), data)
                     .set_filter(Filter::Paeth)
             ).unwrap();
         });
