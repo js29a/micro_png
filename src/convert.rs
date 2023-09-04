@@ -178,6 +178,7 @@ struct Qtz {
     cube: Cube,
     vec_memo: HashMap<QtzKey, Vec<u16>>,
     qtz_memo: HashMap<QtzKey, u16>,
+    bounds_memo: HashMap<QtzKey, (u16, u16)>,
     width: usize,
     height: usize
 }
@@ -254,6 +255,10 @@ impl Qtz {
     fn bounds(&mut self, r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize) -> (u16, u16) {
         let key: QtzKey  = (r, g, b, c);
 
+        if let Some(v) = self.bounds_memo.get(&key) {
+            return *v
+        }
+
         if let Some(v) = self.vec_memo.get(&key) {
             if v.is_empty() {
                 (0x7fff, 0x8000)
@@ -262,8 +267,152 @@ impl Qtz {
                 (v[0], v[v.len() - 1])
             }
         } else {
-            let vec = self.gen_vec(r, g, b, c);
-            (vec[0], vec[vec.len() - 1])
+            let mut rr = r.0 >> 8;
+            let mut gg = g.0 >> 8;
+            let mut bb = b.0 >> 8;
+
+            match c {
+                0 => {
+                    let mut lo: Option<u16> = None;
+                    let mut hi: Option<u16> = None;
+
+                    (r.0 >> 8 ..= r.1 >> 8).take_while(|rr| {
+                        (g.0 >> 8 ..= g.1 >> 8).take_while(|gg| {
+                            (b.0 >> 8 ..= b.1 >> 8).take_while(|bb| {
+                                let offs = ((*rr as u32) << 16) | ((*gg as u32) << 8) | *bb as u32;
+                                if self.cube[offs as usize] > 0 {
+                                    lo = Some(rr << 8)
+                                }
+                                lo.is_none()
+                            }).last();
+                            lo.is_none()
+                        }).last();
+
+                        lo.is_none()
+                    }).last();
+
+                    (r.0 >> 8 ..= r.1 >> 8).rev().take_while(|rr| {
+                        (g.0 >> 8 ..= g.1 >> 8).take_while(|gg| {
+                            (b.0 >> 8 ..= b.1 >> 8).take_while(|bb| {
+                                let offs = ((*rr as u32) << 16) | ((*gg as u32) << 8) | *bb as u32;
+                                if self.cube[offs as usize] > 0 {
+                                    hi = Some(rr << 8)
+                                }
+                                hi.is_none()
+                            }).last();
+                            hi.is_none()
+                        }).last();
+
+                        hi.is_none()
+                    }).last();
+
+                    assert!(lo.is_none() && hi.is_none() || lo.is_some() && hi.is_some());
+
+                    if lo.is_some() && hi.is_some() {
+                        self.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
+                        (lo.unwrap(), hi.unwrap())
+                    }
+                    else {
+                        self.bounds_memo.insert(key, (0x7fff, 0x8000));
+                        (0x7fff, 0x8000)
+                    }
+                },
+                1 => {
+                    let mut lo: Option<u16> = None;
+                    let mut hi: Option<u16> = None;
+
+                    (g.0 >> 8 ..= g.1 >> 8).take_while(|gg| {
+                        (r.0 >> 8 ..= r.1 >> 8).take_while(|rr| {
+                            (b.0 >> 8 ..= b.1 >> 8).take_while(|bb| {
+                                let offs = ((*rr as u32) << 16) | ((*gg as u32) << 8) | *bb as u32;
+                                if self.cube[offs as usize] > 0 {
+                                    lo = Some(gg << 8)
+                                }
+                                lo.is_none()
+                            }).last();
+                            lo.is_none()
+                        }).last();
+
+                        lo.is_none()
+                    }).last();
+
+                    (g.0 >> 8 ..= g.1 >> 8).rev().take_while(|gg| {
+                        (r.0 >> 8 ..= r.1 >> 8).take_while(|rr| {
+                            (b.0 >> 8 ..= b.1 >> 8).take_while(|bb| {
+                                let offs = ((*rr as u32) << 16) | ((*gg as u32) << 8) | *bb as u32;
+                                if self.cube[offs as usize] > 0 {
+                                    hi = Some(gg << 8)
+                                }
+                                hi.is_none()
+                            }).last();
+                            hi.is_none()
+                        }).last();
+
+                        hi.is_none()
+                    }).last();
+
+                    assert!(lo.is_none() && hi.is_none() || lo.is_some() && hi.is_some());
+
+                    if lo.is_some() && hi.is_some() {
+                        self.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
+                        (lo.unwrap(), hi.unwrap())
+                    }
+                    else {
+                        self.bounds_memo.insert(key, (0x7fff, 0x8000));
+                        (0x7fff, 0x8000)
+                    }
+
+                },
+                2 => {
+                    let mut lo: Option<u16> = None;
+                    let mut hi: Option<u16> = None;
+
+                    (b.0 >> 8 ..= b.1 >> 8).take_while(|bb| {
+                        (g.0 >> 8 ..= g.1 >> 8).take_while(|gg| {
+                            (r.0 >> 8 ..= r.1 >> 8).take_while(|rr| {
+                                let offs = ((*rr as u32) << 16) | ((*gg as u32) << 8) | *bb as u32;
+                                if self.cube[offs as usize] > 0 {
+                                    lo = Some(bb << 8)
+                                }
+                                lo.is_none()
+                            }).last();
+                            lo.is_none()
+                        }).last();
+
+                        lo.is_none()
+                    }).last();
+
+                    (b.0 >> 8 ..= b.1 >> 8).rev().take_while(|bb| {
+                        (g.0 >> 8 ..= g.1 >> 8).take_while(|gg| {
+                            (r.0 >> 8 ..= r.1 >> 8).take_while(|rr| {
+                                let offs = ((*rr as u32) << 16) | ((*gg as u32) << 8) | *bb as u32;
+                                if self.cube[offs as usize] > 0 {
+                                    hi = Some(bb << 8)
+                                }
+                                hi.is_none()
+                            }).last();
+                            hi.is_none()
+                        }).last();
+
+                        hi.is_none()
+                    }).last();
+
+                    assert!(lo.is_none() && hi.is_none() || lo.is_some() && hi.is_some());
+
+                    if lo.is_some() && hi.is_some() {
+                        self.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
+                        (lo.unwrap(), hi.unwrap())
+                    }
+                    else {
+                        self.bounds_memo.insert(key, (0x7fff, 0x8000));
+                        (0x7fff, 0x8000)
+                    }
+                },
+
+                _ => panic!("bad bounds call")
+            }
+            //let vec = self.gen_vec(r, g, b, c);
+            //(vec[0], vec[vec.len() - 1])
         }
     }
 
@@ -405,6 +554,7 @@ fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
         cube,
         vec_memo: HashMap::new(),
         qtz_memo: HashMap::new(),
+        bounds_memo: HashMap::new(),
         width,
         height
     };
