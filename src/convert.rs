@@ -260,21 +260,27 @@ impl Qtz {
         }
 
         if let Some(v) = self.vec_memo.get(&key) {
+            let lo;
+            let hi;
+
             if v.is_empty() {
-                (0x7fff, 0x8000)
+                lo = 0x7fff;
+                hi = 0x8000
             }
             else {
-                (v[0], v[v.len() - 1])
+                lo = v[0];
+                hi = v[v.len() - 1]
             }
+
+            self.bounds_memo.insert(key, (lo, hi));
+
+            (lo, hi)
         } else {
-            let mut rr = r.0 >> 8;
-            let mut gg = g.0 >> 8;
-            let mut bb = b.0 >> 8;
+            let mut lo: Option<u16> = None;
+            let mut hi: Option<u16> = None;
 
             match c {
                 0 => {
-                    let mut lo: Option<u16> = None;
-                    let mut hi: Option<u16> = None;
 
                     (r.0 >> 8 ..= r.1 >> 8).take_while(|rr| {
                         (g.0 >> 8 ..= g.1 >> 8).take_while(|gg| {
@@ -318,9 +324,6 @@ impl Qtz {
                     }
                 },
                 1 => {
-                    let mut lo: Option<u16> = None;
-                    let mut hi: Option<u16> = None;
-
                     (g.0 >> 8 ..= g.1 >> 8).take_while(|gg| {
                         (r.0 >> 8 ..= r.1 >> 8).take_while(|rr| {
                             (b.0 >> 8 ..= b.1 >> 8).take_while(|bb| {
@@ -364,9 +367,6 @@ impl Qtz {
 
                 },
                 2 => {
-                    let mut lo: Option<u16> = None;
-                    let mut hi: Option<u16> = None;
-
                     (b.0 >> 8 ..= b.1 >> 8).take_while(|bb| {
                         (g.0 >> 8 ..= g.1 >> 8).take_while(|gg| {
                             (r.0 >> 8 ..= r.1 >> 8).take_while(|rr| {
