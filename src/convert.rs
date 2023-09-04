@@ -204,7 +204,7 @@ impl Qtz {
         let key: QtzKey  = (r, g, b, c);
 
         if let Some(v) = self.vec_memo.get(&key) {
-            return v.clone();
+            return v.clone()
         }
 
         match c {
@@ -251,6 +251,22 @@ impl Qtz {
         output
     }
 
+    fn bounds(&mut self, r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize) -> (u16, u16) {
+        let key: QtzKey  = (r, g, b, c);
+
+        if let Some(v) = self.vec_memo.get(&key) {
+            if v.is_empty() {
+                (0x7fff, 0x8000)
+            }
+            else {
+                (v[0], v[v.len() - 1])
+            }
+        } else {
+            let vec = self.gen_vec(r, g, b, c);
+            (vec[0], vec[vec.len() - 1])
+        }
+    }
+
     fn elect_qtz(&mut self, r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize) -> u16 {
         assert!(c < 3);
 
@@ -264,6 +280,9 @@ impl Qtz {
             return *v
         }
 
+        //let bn = self.bounds(r, g, b, c);
+        //return ((bn.1 as u32 + bn.0 as u32) / 2) as u16;
+
         let vec = self.gen_vec(r, g, b, c);
 
         let res = if vec.is_empty() {
@@ -275,20 +294,20 @@ impl Qtz {
             }
         }
         else {
-            let mut a = 0_f32;
-            let mut b = 0_f32;
-            let mut c = 0_f32;
+            let mut a = 0_i64;
+            let mut b = 0_i64;
+            let mut c = 0_i64;
 
             // a * x * x + b * x + c
             // (x - v) * (x - v) -> x * x + v * v - 2 * x * v
 
             vec.iter().for_each(|v| {
-                a += 1.0;
-                b += -2.0 * *v as f32;
-                c += *v as f32 * *v as f32;
+                a += 1;
+                b += -2 * *v as i64;
+                c += *v as i64 * *v as i64;
             });
 
-            (-b / a * 0.5) as u16
+            (-b / a / 2) as u16
         };
 
         self.qtz_memo.insert(key, res);
@@ -297,13 +316,21 @@ impl Qtz {
     }
 
     fn elect_div(&mut self, r: (u16, u16), g: (u16, u16), b: (u16, u16)) -> usize {
-        let vec_r = self.gen_vec(r, g, b, 0);
-        let vec_g = self.gen_vec(r, g, b, 1);
-        let vec_b = self.gen_vec(r, g, b, 2);
+        let br = self.bounds(r, g, b, 0);
+        let bg = self.bounds(r, g, b, 1);
+        let bb = self.bounds(r, g, b, 2);
 
-        let r_dist = if vec_r.is_empty() { 0 } else { vec_r[vec_r.len() - 1] - vec_r[0] };
-        let g_dist = if vec_g.is_empty() { 0 } else { vec_g[vec_g.len() - 1] - vec_g[0] };
-        let b_dist = if vec_b.is_empty() { 0 } else { vec_b[vec_b.len() - 1] - vec_b[0] };
+        let r_dist = br.1 - br.0;
+        let g_dist = bg.1 - bg.0;
+        let b_dist = bb.1 - bb.0;
+
+        //let vec_r = self.gen_vec(r, g, b, 0);
+        //let vec_g = self.gen_vec(r, g, b, 1);
+        //let vec_b = self.gen_vec(r, g, b, 2);
+
+        //let r_dist = if vec_r.is_empty() { 0 } else { vec_r[vec_r.len() - 1] - vec_r[0] };
+        //let g_dist = if vec_g.is_empty() { 0 } else { vec_g[vec_g.len() - 1] - vec_g[0] };
+        //let b_dist = if vec_b.is_empty() { 0 } else { vec_b[vec_b.len() - 1] - vec_b[0] };
 
         if r_dist >= g_dist && r_dist >= b_dist {
             0
