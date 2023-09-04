@@ -172,9 +172,12 @@ fn to_grayscale(orig: Vec<Vec<RGBA16>>, bits: usize, alpha: bool, gs: Grayscale,
 
 type Cube = Vec<u64>;
 
+type QtzKey = ((u16, u16), (u16, u16), (u16, u16), usize);
+
 struct Qtz {
     cube: Cube,
-    memo: HashMap<u64, Vec<u16>>,
+    vec_memo: HashMap<QtzKey, Vec<u16>>,
+    qtz_memo: HashMap<QtzKey, u16>,
     width: usize,
     height: usize
 }
@@ -198,16 +201,9 @@ impl Qtz {
         g.1 >>= 8;
         b.1 >>= 8;
 
-        let key: u64 =
-            (( c  as u64) << 48) |
-            ((r.0 as u64) << 40) |
-            ((r.1 as u64) << 32) |
-            ((g.0 as u64) << 24) |
-            ((g.1 as u64) << 16) |
-            ((b.0 as u64) <<  8) |
-            ( b.1 as u64       );
+        let key: QtzKey  = (r, g, b, c);
 
-        if let Some(v) = self.memo.get(&key) {
+        if let Some(v) = self.vec_memo.get(&key) {
             return v.clone();
         }
 
@@ -218,7 +214,8 @@ impl Qtz {
                         (b.0 ..= b.1).for_each(|bb| {
                             let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
                             let cnt = self.cube[offs as usize] as usize;
-                            (0 .. cnt).for_each(|_| output.push(rr << 8));
+                            output.resize(output.len() + cnt, rr << 8);
+                            //(0 .. cnt).for_each(|_| output.push(rr << 8));
                         });
                     });
                 }),
@@ -228,7 +225,8 @@ impl Qtz {
                         (b.0 ..= b.1).for_each(|bb| {
                             let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
                             let cnt = self.cube[offs as usize] as usize;
-                            (0 .. cnt).for_each(|_| output.push(gg << 8));
+                            output.resize(output.len() + cnt, gg << 8);
+                            //(0 .. cnt).for_each(|_| output.push(gg << 8));
                         });
                     });
                 }),
@@ -238,7 +236,8 @@ impl Qtz {
                         (g.0 ..= g.1).for_each(|gg| {
                             let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
                             let cnt = self.cube[offs as usize] as usize;
-                            (0 .. cnt).for_each(|_| output.push(bb << 8));
+                            output.resize(output.len() + cnt, bb << 8);
+                            //(0 .. cnt).for_each(|_| output.push(bb << 8));
                         });
                     });
                 }),
@@ -247,128 +246,114 @@ impl Qtz {
 
         output.shrink_to_fit();
 
-        self.memo.insert(key, output.clone());
+        self.vec_memo.insert(key, output.clone());
 
         output
     }
-}
 
-// c -> component #, 0 .. 2
-fn elect_qtz(r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize, qtz: &mut Qtz) -> u16 {
-    assert!(c < 3);
+    fn elect_qtz(&mut self, r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize) -> u16 {
+        assert!(c < 3);
 
-    assert!(r.0 <= r.1);
-    assert!(g.0 <= g.1);
-    assert!(b.0 <= b.1);
+        assert!(r.0 <= r.1);
+        assert!(g.0 <= g.1);
+        assert!(b.0 <= b.1);
 
-    let vec = qtz.gen_vec(r, g, b, c);
+        let key = (r, g, b, c);
 
-    if vec.is_empty() {
-        match c {
-            0 => ((r.0 as u32 + r.1 as u32) >> 1) as u16,
-            1 => ((g.0 as u32 + g.1 as u32) >> 1) as u16,
-            2 => ((b.0 as u32 + b.1 as u32) >> 1) as u16,
-            _ => panic!("bad call of elect_qtz")
+        if let Some(v) = self.qtz_memo.get(&key) {
+            return *v
+        }
+
+        let vec = self.gen_vec(r, g, b, c);
+
+        let res = if vec.is_empty() {
+            match c {
+                0 => ((r.0 as u32 + r.1 as u32) >> 1) as u16,
+                1 => ((g.0 as u32 + g.1 as u32) >> 1) as u16,
+                2 => ((b.0 as u32 + b.1 as u32) >> 1) as u16,
+                _ => panic!("bad call of elect_qtz")
+            }
+        }
+        else {
+            let mut a = 0_f32;
+            let mut b = 0_f32;
+            let mut c = 0_f32;
+
+            // a * x * x + b * x + c
+            // (x - v) * (x - v) -> x * x + v * v - 2 * x * v
+
+            vec.iter().for_each(|v| {
+                a += 1.0;
+                b += -2.0 * *v as f32;
+                c += *v as f32 * *v as f32;
+            });
+
+            (-b / a * 0.5) as u16
+        };
+
+        self.qtz_memo.insert(key, res);
+
+        res
+    }
+
+    fn elect_div(&mut self, r: (u16, u16), g: (u16, u16), b: (u16, u16)) -> usize {
+        let vec_r = self.gen_vec(r, g, b, 0);
+        let vec_g = self.gen_vec(r, g, b, 1);
+        let vec_b = self.gen_vec(r, g, b, 2);
+
+        let r_dist = if vec_r.is_empty() { 0 } else { vec_r[vec_r.len() - 1] - vec_r[0] };
+        let g_dist = if vec_g.is_empty() { 0 } else { vec_g[vec_g.len() - 1] - vec_g[0] };
+        let b_dist = if vec_b.is_empty() { 0 } else { vec_b[vec_b.len() - 1] - vec_b[0] };
+
+        if r_dist >= g_dist && r_dist >= b_dist {
+            0
+        }
+        else if g_dist >= b_dist {
+            1
+        }
+        else {
+            2
         }
     }
-    else {
-        let mut a = 0_f32;
-        let mut b = 0_f32;
-        let mut c = 0_f32;
 
-        // a * x * x + b * x + c
-        // (x - v) * (x - v) -> x * x + v * v - 2 * x * v
+    fn elect_palette_sub(&mut self, r: (u16, u16), g: (u16, u16), b: (u16, u16), bits: usize, pal: &mut Vec<RGBA>, max_ps: usize) {
+        if bits == 0 {
+            let q_0 = self.elect_qtz(r, g, b, 0);
+            let q_1 = self.elect_qtz(r, g, b, 1);
+            let q_2 = self.elect_qtz(r, g, b, 2);
 
-        vec.iter().for_each(|v| {
-            a += 1.0;
-            b += -2.0 * *v as f32;
-            c += *v as f32 * *v as f32;
-        });
-
-        (-b / a * 0.5) as u16
-    }
-}
-
-fn elect_div(r: (u16, u16), g: (u16, u16), b: (u16, u16), qtz: &mut Qtz) -> usize {
-    let vec_r = qtz.gen_vec(r, g, b, 0);
-    let vec_g = qtz.gen_vec(r, g, b, 1);
-    let vec_b = qtz.gen_vec(r, g, b, 2);
-
-    //let r_mid = elect_qtz(r, g, b, 0, qtz) as usize;
-    //let g_mid = elect_qtz(r, g, b, 0, qtz) as usize;
-    //let b_mid = elect_qtz(r, g, b, 0, qtz) as usize;
-
-    //let r_avg = (if vec_r.is_empty() { 0 } else { vec_r[0] as usize + vec_r[vec_r.len() - 1] as usize }) / 2;
-    //let g_avg = (if vec_g.is_empty() { 0 } else { vec_g[0] as usize + vec_g[vec_g.len() - 1] as usize }) / 2;
-    //let b_avg = (if vec_b.is_empty() { 0 } else { vec_b[0] as usize + vec_b[vec_b.len() - 1] as usize }) / 2;
-
-    //let r_med = if vec_r.is_empty() { 0 } else { vec_r[vec_r.len() / 2] as usize };
-    //let g_med = if vec_g.is_empty() { 0 } else { vec_g[vec_g.len() / 2] as usize };
-    //let b_med = if vec_b.is_empty() { 0 } else { vec_b[vec_b.len() / 2] as usize };
-
-    //let r_dist = if r_med > r_avg { r_med - r_avg } else { r_avg - r_med };
-    //let g_dist = if g_med > g_avg { g_med - g_avg } else { g_avg - g_med };
-    //let b_dist = if b_med > b_avg { b_med - b_avg } else { b_avg - b_med };
-
-    //let r_dist = if r_mid > r_avg { r_mid - r_avg } else { r_avg - r_mid };
-    //let g_dist = if g_mid > g_avg { g_mid - g_avg } else { g_avg - g_mid };
-    //let b_dist = if b_mid > b_avg { b_mid - b_avg } else { b_avg - b_mid };
-
-    //let r_dist = r.1 - r.0;
-    //let g_dist = g.1 - g.0;
-    //let b_dist = b.1 - b.0;
-
-    let r_dist = if vec_r.is_empty() { 0 } else { vec_r[vec_r.len() - 1] - vec_r[0] };
-    let g_dist = if vec_g.is_empty() { 0 } else { vec_g[vec_g.len() - 1] - vec_g[0] };
-    let b_dist = if vec_b.is_empty() { 0 } else { vec_b[vec_b.len() - 1] - vec_b[0] };
-
-    if r_dist >= g_dist && r_dist >= b_dist {
-        0
-    }
-    else if g_dist >= b_dist {
-        1
-    }
-    else {
-        2
-    }
-}
-
-fn elect_palette_sub(r: (u16, u16), g: (u16, u16), b: (u16, u16), bits: usize, pal: &mut Vec<RGBA>, qtz: &mut Qtz, max_ps: usize) {
-    if bits == 0 {
-        let q_0 = elect_qtz(r, g, b, 0, qtz);
-        let q_1 = elect_qtz(r, g, b, 1, qtz);
-        let q_2 = elect_qtz(r, g, b, 2, qtz);
-
-        if pal.len() < max_ps {
-            pal.push((
-                (q_0 >> 8) as u8,
-                (q_1 >> 8) as u8,
-                (q_2 >> 8) as u8,
-                0xff
-            ));
+            if pal.len() < max_ps {
+                pal.push((
+                    (q_0 >> 8) as u8,
+                    (q_1 >> 8) as u8,
+                    (q_2 >> 8) as u8,
+                    0xff
+                ));
+            }
         }
-    }
-    else {
-        let c1 = elect_div(r, g, b, qtz);
-        let split = elect_qtz(r, g, b, c1, qtz);
+        else {
+            let c1 = self.elect_div(r, g, b);
+            let split = self.elect_qtz(r, g, b, c1);
 
-        match c1 {
-            0 => {
-                elect_palette_sub((r.0, split), g, b, bits - 1,  pal, qtz, max_ps);
-                elect_palette_sub((split, r.1), g, b, bits - 1,  pal, qtz, max_ps);
-            },
-            1 => {
-                elect_palette_sub(r, (g.0, split), b, bits - 1,  pal, qtz, max_ps);
-                elect_palette_sub(r, (split, g.1), b, bits - 1,  pal, qtz, max_ps);
-            },
-            2 => {
-                elect_palette_sub(r, g, (b.0, split), bits - 1,  pal, qtz, max_ps);
-                elect_palette_sub(r, g, (split, b.1), bits - 1,  pal, qtz, max_ps);
-            },
-            _ => panic!("internal elect_palette_sub error")
+            match c1 {
+                0 => {
+                    self.elect_palette_sub((r.0, split), g, b, bits - 1,  pal, max_ps);
+                    self.elect_palette_sub((split, r.1), g, b, bits - 1,  pal, max_ps);
+                },
+                1 => {
+                    self.elect_palette_sub(r, (g.0, split), b, bits - 1,  pal, max_ps);
+                    self.elect_palette_sub(r, (split, g.1), b, bits - 1,  pal, max_ps);
+                },
+                2 => {
+                    self.elect_palette_sub(r, g, (b.0, split), bits - 1,  pal, max_ps);
+                    self.elect_palette_sub(r, g, (split, b.1), bits - 1,  pal, max_ps);
+                },
+                _ => panic!("internal elect_palette_sub error")
+            }
         }
     }
 }
+
 
 fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
     let mut pal: Vec<RGBA> = Vec::new();
@@ -391,7 +376,8 @@ fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
 
     let mut qtz = Qtz {
         cube,
-        memo: HashMap::new(),
+        vec_memo: HashMap::new(),
+        qtz_memo: HashMap::new(),
         width,
         height
     };
@@ -411,7 +397,7 @@ fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
         //});
     //}
 
-    elect_palette_sub((0, 0xffff), (0, 0xffff), (0, 0xffff), bits, &mut pal, &mut qtz, 1 << bits);
+    qtz.elect_palette_sub((0, 0xffff), (0, 0xffff), (0, 0xffff), bits, &mut pal, 1 << bits);
     assert_eq!(pal.len(), 1 << bits);
     pal
 }
@@ -641,17 +627,17 @@ mod tests {
             //ColorType::RGB16, // remove alpha
             //ColorType::RGBA,
             //ColorType::RGB,
-            ColorType::GRAYA(Grayscale::G16),
-            ColorType::GRAYA(Grayscale::G8),
-            ColorType::GRAY(Grayscale::G16),
-            ColorType::GRAY(Grayscale::G8),
+            //ColorType::GRAYA(Grayscale::G16),
+            //ColorType::GRAYA(Grayscale::G8),
+            //ColorType::GRAY(Grayscale::G16),
+            //ColorType::GRAY(Grayscale::G8),
             //ColorType::GRAY(Grayscale::G4),
             //ColorType::GRAY(Grayscale::G2),
             //ColorType::GRAY(Grayscale::G1),
-            //ColorType::NDX(Palette::P1),
-            //ColorType::NDX(Palette::P2),
-            //ColorType::NDX(Palette::P4),
-            //ColorType::NDX(Palette::P8),
+            ColorType::NDX(Palette::P1),
+            ColorType::NDX(Palette::P2),
+            ColorType::NDX(Palette::P4),
+            ColorType::NDX(Palette::P8),
         ];
 
         let orig = read_png(ORIG).unwrap();
@@ -673,17 +659,17 @@ mod tests {
             //ColorType::RGB16, // remove alpha
             //ColorType::RGBA,
             //ColorType::RGB,
-            ColorType::GRAYA(Grayscale::G16),
-            ColorType::GRAYA(Grayscale::G8),
-            ColorType::GRAY(Grayscale::G16),
-            ColorType::GRAY(Grayscale::G8),
+            //ColorType::GRAYA(Grayscale::G16),
+            //ColorType::GRAYA(Grayscale::G8),
+            //ColorType::GRAY(Grayscale::G16),
+            //ColorType::GRAY(Grayscale::G8),
             //ColorType::GRAY(Grayscale::G4),
             //ColorType::GRAY(Grayscale::G2),
             //ColorType::GRAY(Grayscale::G1),
-            //ColorType::NDX(Palette::P1),
-            //ColorType::NDX(Palette::P2),
-            //ColorType::NDX(Palette::P4),
-            //ColorType::NDX(Palette::P8),
+            ColorType::NDX(Palette::P1),
+            ColorType::NDX(Palette::P2),
+            ColorType::NDX(Palette::P4),
+            ColorType::NDX(Palette::P8),
         ];
 
         let orig = read_png(ORIG).unwrap();
