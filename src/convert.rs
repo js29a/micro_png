@@ -7,8 +7,7 @@ use std::collections::HashMap;
 
 use std::sync::{Arc, Mutex, RwLock};
 use futures_executor::block_on;
-use futures::future::join_all;
-use futures::future::{BoxFuture, FutureExt};
+use futures::future::{BoxFuture, join_all};
 
 use crate::*;
 
@@ -277,11 +276,11 @@ impl Qtz {
 
             if v.is_empty() {
                 lo = 0x7fff;
-                hi = 0x8000
+                hi = 0x8000;
             }
             else {
                 lo = v[0];
-                hi = v[v.len() - 1]
+                hi = v[v.len() - 1];
             }
 
             //let mut write = this.write().unwrap();
@@ -329,12 +328,15 @@ impl Qtz {
 
                     //let mut write = this.write().unwrap();
 
-                    if lo.is_some() && hi.is_some() {
-                        //write.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
-                        (lo.unwrap(), hi.unwrap())
+                    if let Some(l) = lo {
+                        if let Some(h) = hi {
+                            (l, h)
+                        }
+                        else {
+                            (0x7fff, 0x8000)
+                        }
                     }
                     else {
-                        //write.bounds_memo.insert(key, (0x7fff, 0x8000));
                         (0x7fff, 0x8000)
                     }
                 },
@@ -373,15 +375,17 @@ impl Qtz {
 
                     //let mut write = this.write().unwrap();
 
-                    if lo.is_some() && hi.is_some() {
-                        //write.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
-                        (lo.unwrap(), hi.unwrap())
+                    if let Some(l) = lo {
+                        if let Some(h) = hi {
+                            (l, h)
+                        }
+                        else {
+                            (0x7fff, 0x8000)
+                        }
                     }
                     else {
-                        //write.bounds_memo.insert(key, (0x7fff, 0x8000));
                         (0x7fff, 0x8000)
                     }
-
                 },
                 2 => {
                     (b.0 >> 8 ..= b.1 >> 8).take_while(|bb| {
@@ -418,12 +422,15 @@ impl Qtz {
 
                     //let mut write = this.write().unwrap();
 
-                    if lo.is_some() && hi.is_some() {
-                        //write.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
-                        (lo.unwrap(), hi.unwrap())
+                    if let Some(l) = lo {
+                        if let Some(h) = hi {
+                            (l, h)
+                        }
+                        else {
+                            (0x7fff, 0x8000)
+                        }
                     }
                     else {
-                        //write.bounds_memo.insert(key, (0x7fff, 0x8000));
                         (0x7fff, 0x8000)
                     }
                 },
@@ -583,7 +590,7 @@ pub fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
         });
     });
 
-    let mut qtz = Qtz {
+    let qtz = Qtz {
         cube,
         vec_memo: HashMap::new(),
         qtz_memo: HashMap::new(),
@@ -618,7 +625,7 @@ pub fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
         //let data1 = Arc::new(RwLock::new(qtz));
 
         workers.push(async_std::task::spawn(
-            Qtz::elect_palette_sub(data1, (0, 0xffff), (0, 0xffff), (0, 0xffff), bits, 1 << bits)
+            async move { Qtz::elect_palette_sub(data1, (0, 0xffff), (0, 0xffff), (0, 0xffff), bits, 1 << bits).await }
         ));
 
         block_on(join_all(workers));

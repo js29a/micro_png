@@ -2497,7 +2497,7 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                 let mut cur: Vec<u8> = unpacked;
 
                 let mut map: Vec<Vec<usize>> = vec![vec![0_usize; width]; height];
-                let mut slices = vec![0_usize; 8];
+                let mut slices = [0_usize; 8];
 
                 (0 .. height).for_each(|y| {
                     (0 .. width).for_each(|x| {
