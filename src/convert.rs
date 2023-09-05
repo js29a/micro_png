@@ -5,6 +5,11 @@
 use std::iter::zip;
 use std::collections::HashMap;
 
+use std::sync::{Arc, Mutex, RwLock};
+use futures_executor::block_on;
+use futures::future::join_all;
+use futures::future::{BoxFuture, FutureExt};
+
 use crate::*;
 
 fn add_frac_clamp(dest: &mut (u16, u16, u16, u16), mut val: (i32, i32, i32, i32), num: i32, den: i32, bits: usize) {
@@ -180,19 +185,22 @@ struct Qtz {
     qtz_memo: HashMap<QtzKey, u16>,
     bounds_memo: HashMap<QtzKey, (u16, u16)>,
     width: usize,
-    height: usize
+    height: usize,
+    pal: Mutex<Vec<RGBA>>
 }
 
 impl Qtz {
-    fn gen_vec(&mut self, mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), c: usize) -> Vec<u16> {
+    fn gen_vec(this: Arc<RwLock<Self>>, mut r: (u16, u16), mut g: (u16, u16), mut b: (u16, u16), c: usize) -> Vec<u16> {
         assert!(c < 3);
 
         assert!(r.0 <= r.1);
         assert!(g.0 <= g.1);
         assert!(b.0 <= b.1);
 
+        let data = this.read().unwrap();
+
         let mut output: Vec<u16> = Vec::new();
-        output.reserve(self.width * self.height);
+        output.reserve(data.width * data.height);
 
         r.0 >>= 8;
         g.0 >>= 8;
@@ -204,7 +212,7 @@ impl Qtz {
 
         let key: QtzKey  = (r, g, b, c);
 
-        if let Some(v) = self.vec_memo.get(&key) {
+        if let Some(v) = data.vec_memo.get(&key) {
             return v.clone()
         }
 
@@ -214,7 +222,7 @@ impl Qtz {
                     (g.0 ..= g.1).for_each(|gg| {
                         (b.0 ..= b.1).for_each(|bb| {
                             let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
-                            let cnt = self.cube[offs as usize] as usize;
+                            let cnt = data.cube[offs as usize] as usize;
                             output.resize(output.len() + cnt, rr << 8);
                             //(0 .. cnt).for_each(|_| output.push(rr << 8));
                         });
@@ -225,7 +233,7 @@ impl Qtz {
                     (r.0 ..= r.1).for_each(|rr| {
                         (b.0 ..= b.1).for_each(|bb| {
                             let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
-                            let cnt = self.cube[offs as usize] as usize;
+                            let cnt = data.cube[offs as usize] as usize;
                             output.resize(output.len() + cnt, gg << 8);
                             //(0 .. cnt).for_each(|_| output.push(gg << 8));
                         });
@@ -236,7 +244,7 @@ impl Qtz {
                     (r.0 ..= r.1).for_each(|rr| {
                         (g.0 ..= g.1).for_each(|gg| {
                             let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
-                            let cnt = self.cube[offs as usize] as usize;
+                            let cnt = data.cube[offs as usize] as usize;
                             output.resize(output.len() + cnt, bb << 8);
                             //(0 .. cnt).for_each(|_| output.push(bb << 8));
                         });
@@ -247,19 +255,23 @@ impl Qtz {
 
         output.shrink_to_fit();
 
-        self.vec_memo.insert(key, output.clone());
+        let mut write = this.write().unwrap();
+
+        write.vec_memo.insert(key, output.clone());
 
         output
     }
 
-    fn bounds(&mut self, r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize) -> (u16, u16) {
+    fn bounds(this: Arc<RwLock<Self>>, r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize) -> (u16, u16) {
         let key: QtzKey  = (r, g, b, c);
 
-        if let Some(v) = self.bounds_memo.get(&key) {
+        let data = this.read().unwrap();
+
+        if let Some(v) = data.bounds_memo.get(&key) {
             return *v
         }
 
-        if let Some(v) = self.vec_memo.get(&key) {
+        if let Some(v) = data.vec_memo.get(&key) {
             let lo;
             let hi;
 
@@ -272,7 +284,8 @@ impl Qtz {
                 hi = v[v.len() - 1]
             }
 
-            self.bounds_memo.insert(key, (lo, hi));
+            let mut write = this.write().unwrap();
+            write.bounds_memo.insert(key, (lo, hi));
 
             (lo, hi)
         } else {
@@ -286,7 +299,7 @@ impl Qtz {
                         (g.0 >> 8 ..= g.1 >> 8).take_while(|gg| {
                             (b.0 >> 8 ..= b.1 >> 8).take_while(|bb| {
                                 let offs = ((*rr as u32) << 16) | ((*gg as u32) << 8) | *bb as u32;
-                                if self.cube[offs as usize] > 0 {
+                                if data.cube[offs as usize] > 0 {
                                     lo = Some(rr << 8)
                                 }
                                 lo.is_none()
@@ -301,7 +314,7 @@ impl Qtz {
                         (g.0 >> 8 ..= g.1 >> 8).take_while(|gg| {
                             (b.0 >> 8 ..= b.1 >> 8).take_while(|bb| {
                                 let offs = ((*rr as u32) << 16) | ((*gg as u32) << 8) | *bb as u32;
-                                if self.cube[offs as usize] > 0 {
+                                if data.cube[offs as usize] > 0 {
                                     hi = Some(rr << 8)
                                 }
                                 hi.is_none()
@@ -314,12 +327,14 @@ impl Qtz {
 
                     assert!(lo.is_none() && hi.is_none() || lo.is_some() && hi.is_some());
 
+                    let mut write = this.write().unwrap();
+
                     if lo.is_some() && hi.is_some() {
-                        self.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
+                        write.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
                         (lo.unwrap(), hi.unwrap())
                     }
                     else {
-                        self.bounds_memo.insert(key, (0x7fff, 0x8000));
+                        write.bounds_memo.insert(key, (0x7fff, 0x8000));
                         (0x7fff, 0x8000)
                     }
                 },
@@ -328,7 +343,7 @@ impl Qtz {
                         (r.0 >> 8 ..= r.1 >> 8).take_while(|rr| {
                             (b.0 >> 8 ..= b.1 >> 8).take_while(|bb| {
                                 let offs = ((*rr as u32) << 16) | ((*gg as u32) << 8) | *bb as u32;
-                                if self.cube[offs as usize] > 0 {
+                                if data.cube[offs as usize] > 0 {
                                     lo = Some(gg << 8)
                                 }
                                 lo.is_none()
@@ -343,7 +358,7 @@ impl Qtz {
                         (r.0 >> 8 ..= r.1 >> 8).take_while(|rr| {
                             (b.0 >> 8 ..= b.1 >> 8).take_while(|bb| {
                                 let offs = ((*rr as u32) << 16) | ((*gg as u32) << 8) | *bb as u32;
-                                if self.cube[offs as usize] > 0 {
+                                if data.cube[offs as usize] > 0 {
                                     hi = Some(gg << 8)
                                 }
                                 hi.is_none()
@@ -356,12 +371,14 @@ impl Qtz {
 
                     assert!(lo.is_none() && hi.is_none() || lo.is_some() && hi.is_some());
 
+                    let mut write = this.write().unwrap();
+
                     if lo.is_some() && hi.is_some() {
-                        self.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
+                        write.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
                         (lo.unwrap(), hi.unwrap())
                     }
                     else {
-                        self.bounds_memo.insert(key, (0x7fff, 0x8000));
+                        write.bounds_memo.insert(key, (0x7fff, 0x8000));
                         (0x7fff, 0x8000)
                     }
 
@@ -371,7 +388,7 @@ impl Qtz {
                         (g.0 >> 8 ..= g.1 >> 8).take_while(|gg| {
                             (r.0 >> 8 ..= r.1 >> 8).take_while(|rr| {
                                 let offs = ((*rr as u32) << 16) | ((*gg as u32) << 8) | *bb as u32;
-                                if self.cube[offs as usize] > 0 {
+                                if data.cube[offs as usize] > 0 {
                                     lo = Some(bb << 8)
                                 }
                                 lo.is_none()
@@ -386,7 +403,7 @@ impl Qtz {
                         (g.0 >> 8 ..= g.1 >> 8).take_while(|gg| {
                             (r.0 >> 8 ..= r.1 >> 8).take_while(|rr| {
                                 let offs = ((*rr as u32) << 16) | ((*gg as u32) << 8) | *bb as u32;
-                                if self.cube[offs as usize] > 0 {
+                                if data.cube[offs as usize] > 0 {
                                     hi = Some(bb << 8)
                                 }
                                 hi.is_none()
@@ -399,12 +416,14 @@ impl Qtz {
 
                     assert!(lo.is_none() && hi.is_none() || lo.is_some() && hi.is_some());
 
+                    let mut write = this.write().unwrap();
+
                     if lo.is_some() && hi.is_some() {
-                        self.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
+                        write.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
                         (lo.unwrap(), hi.unwrap())
                     }
                     else {
-                        self.bounds_memo.insert(key, (0x7fff, 0x8000));
+                        write.bounds_memo.insert(key, (0x7fff, 0x8000));
                         (0x7fff, 0x8000)
                     }
                 },
@@ -416,7 +435,7 @@ impl Qtz {
         }
     }
 
-    fn elect_qtz(&mut self, r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize) -> u16 {
+    fn elect_qtz(this: Arc<RwLock<Self>>, r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize) -> u16 {
         assert!(c < 3);
 
         assert!(r.0 <= r.1);
@@ -425,14 +444,16 @@ impl Qtz {
 
         let key = (r, g, b, c);
 
-        if let Some(v) = self.qtz_memo.get(&key) {
+        let data = this.read().unwrap();
+
+        if let Some(v) = data.qtz_memo.get(&key) {
             return *v
         }
 
-        //let bn = self.bounds(r, g, b, c);
+        //let bn = data.bounds(r, g, b, c);
         //return ((bn.1 as u32 + bn.0 as u32) / 2) as u16;
 
-        let vec = self.gen_vec(r, g, b, c);
+        let vec = Qtz::gen_vec(Arc::clone(&this), r, g, b, c);
 
         let res = if vec.is_empty() {
             match c {
@@ -459,15 +480,17 @@ impl Qtz {
             (-b / a / 2) as u16
         };
 
-        self.qtz_memo.insert(key, res);
+        let mut write = this.write().unwrap();
+
+        write.qtz_memo.insert(key, res);
 
         res
     }
 
-    fn elect_div(&mut self, r: (u16, u16), g: (u16, u16), b: (u16, u16)) -> usize {
-        let br = self.bounds(r, g, b, 0);
-        let bg = self.bounds(r, g, b, 1);
-        let bb = self.bounds(r, g, b, 2);
+    fn elect_div(this: Arc<RwLock<Self>>, r: (u16, u16), g: (u16, u16), b: (u16, u16)) -> usize {
+        let br = Qtz::bounds(Arc::clone(&this), r, g, b, 0);
+        let bg = Qtz::bounds(Arc::clone(&this), r, g, b, 1);
+        let bb = Qtz::bounds(Arc::clone(&this), r, g, b, 2);
 
         let r_dist = br.1 - br.0;
         let g_dist = bg.1 - bg.0;
@@ -492,48 +515,59 @@ impl Qtz {
         }
     }
 
-    fn elect_palette_sub(&mut self, r: (u16, u16), g: (u16, u16), b: (u16, u16), bits: usize, pal: &mut Vec<RGBA>, max_ps: usize) {
-        if bits == 0 {
-            let q_0 = self.elect_qtz(r, g, b, 0);
-            let q_1 = self.elect_qtz(r, g, b, 1);
-            let q_2 = self.elect_qtz(r, g, b, 2);
+    fn elect_palette_sub(this: Arc<RwLock<Self>>, r: (u16, u16), g: (u16, u16), b: (u16, u16), bits: usize, max_ps: usize) -> BoxFuture<'static, ()> {
+        Box::pin(async move {
+            if bits == 0 {
+                let q_0 = Qtz::elect_qtz(Arc::clone(&this), r, g, b, 0);
+                let q_1 = Qtz::elect_qtz(Arc::clone(&this), r, g, b, 1);
+                let q_2 = Qtz::elect_qtz(Arc::clone(&this), r, g, b, 2);
 
-            if pal.len() < max_ps {
-                pal.push((
-                    (q_0 >> 8) as u8,
-                    (q_1 >> 8) as u8,
-                    (q_2 >> 8) as u8,
-                    0xff
-                ));
-            }
-        }
-        else {
-            let c1 = self.elect_div(r, g, b);
-            let split = self.elect_qtz(r, g, b, c1);
+                let write = this.write().unwrap();
+                let mut pal = write.pal.lock().unwrap();
 
-            match c1 {
-                0 => {
-                    self.elect_palette_sub((r.0, split), g, b, bits - 1,  pal, max_ps);
-                    self.elect_palette_sub((split, r.1), g, b, bits - 1,  pal, max_ps);
-                },
-                1 => {
-                    self.elect_palette_sub(r, (g.0, split), b, bits - 1,  pal, max_ps);
-                    self.elect_palette_sub(r, (split, g.1), b, bits - 1,  pal, max_ps);
-                },
-                2 => {
-                    self.elect_palette_sub(r, g, (b.0, split), bits - 1,  pal, max_ps);
-                    self.elect_palette_sub(r, g, (split, b.1), bits - 1,  pal, max_ps);
-                },
-                _ => panic!("internal elect_palette_sub error")
+                if pal.len() < max_ps {
+                    pal.push((
+                        (q_0 >> 8) as u8,
+                        (q_1 >> 8) as u8,
+                        (q_2 >> 8) as u8,
+                        0xff
+                    ));
+                }
             }
-        }
+            else {
+                let c1 = Qtz::elect_div(Arc::clone(&this), r, g, b);
+                let split = Qtz::elect_qtz(Arc::clone(&this), r, g, b, c1);
+
+                match c1 {
+                    0 => {
+                        let workers = vec![
+                            Qtz::elect_palette_sub(Arc::clone(&this), (r.0, split), g, b, bits - 1,  max_ps),
+                            Qtz::elect_palette_sub(Arc::clone(&this), (split, r.1), g, b, bits - 1,  max_ps)
+                        ];
+                        join_all(workers).await;
+                    },
+                    1 => {
+                        let workers = vec![
+                            Qtz::elect_palette_sub(Arc::clone(&this), r, (g.0, split), b, bits - 1,  max_ps),
+                            Qtz::elect_palette_sub(Arc::clone(&this), r, (split, g.1), b, bits - 1,  max_ps)
+                        ];
+                        join_all(workers).await;
+                    },
+                    2 => {
+                        let workers = vec![
+                            Qtz::elect_palette_sub(Arc::clone(&this), r, g, (b.0, split), bits - 1,  max_ps),
+                            Qtz::elect_palette_sub(Arc::clone(&this), r, g, (split, b.1), bits - 1,  max_ps)
+                        ];
+                        join_all(workers).await;
+                    },
+                    _ => panic!("internal elect_palette_sub error")
+                }
+            };
+        })
     }
 }
 
-
-fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
-    let mut pal: Vec<RGBA> = Vec::new();
-
+pub fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
     let width = orig[0].len();
     let height = orig.len();
 
@@ -556,7 +590,8 @@ fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
         qtz_memo: HashMap::new(),
         bounds_memo: HashMap::new(),
         width,
-        height
+        height,
+        pal: Mutex::new(vec![])
     };
 
     //if bits >= 4 {
@@ -574,9 +609,26 @@ fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
         //});
     //}
 
-    qtz.elect_palette_sub((0, 0xffff), (0, 0xffff), (0, 0xffff), bits, &mut pal, 1 << bits);
-    assert_eq!(pal.len(), 1 << bits);
-    pal
+    let data = Arc::new(RwLock::new(qtz));
+
+    {
+        let mut workers = vec![];
+
+        let data1 = Arc::clone(&data);
+
+        //let data1 = Arc::new(RwLock::new(qtz));
+
+        workers.push(async_std::task::spawn(
+            Qtz::elect_palette_sub(data1, (0, 0xffff), (0, 0xffff), (0, 0xffff), bits, 1 << bits)
+        ));
+
+        block_on(join_all(workers));
+    }
+
+    //assert_eq!(qtz.pal.len(), 1 << bits);
+    let tmp = data.read().unwrap();
+    let res = tmp.pal.lock().unwrap();
+    (*res.clone()).to_vec()
 }
 
 fn closest(buf: &mut [Option<u8>], mut color: (u16, u16, u16, u16), pal: &[RGBA]) -> u8 {
