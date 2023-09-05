@@ -181,7 +181,7 @@ type QtzKey = ((u16, u16), (u16, u16), (u16, u16), usize);
 struct Qtz {
     cube: Cube,
     vec_memo: RwLock<HashMap<QtzKey, Arc<Vec<u16>>>>,
-    qtz_memo: RwLock<HashMap<QtzKey, u16>>,
+    qtz_memo: RwLock<HashMap<QtzKey, (u16, u64)>>,
     bounds_memo: RwLock<HashMap<QtzKey, (u16, u16)>>,
     width: usize,
     height: usize,
@@ -250,7 +250,7 @@ impl Qtz {
                         });
                     });
                 }),
-            _ => panic!("bad call of elect_qtz (c={c})")
+            _ => panic!("bad call of gen_vec (c={c})")
         };
 
         output.shrink_to_fit();
@@ -282,10 +282,21 @@ impl Qtz {
             if let Some(v) = memo.get(&key) {
                 let (lo, hi) =
                     if (*v).is_empty() {
-                        (0x7fff, 0x8000)
+                        let res = match c {
+                            0 => ((r.0 as u32 + r.1 as u32) / 2) as u16,
+                            1 => ((g.0 as u32 + g.1 as u32) / 2) as u16,
+                            2 => ((b.0 as u32 + b.1 as u32) / 2) as u16,
+                            _ => panic!("bad call of bounds")
+                        };
+                        (res, res)
                     }
                     else {
-                        ((*v)[0], (*v)[(*v).len() - 1])
+                        if (*v).len() == 1 {
+                            ((*v)[0], (*v)[0])
+                        }
+                        else {
+                            ((*v)[0], (*v)[(*v).len() - 1])
+                        }
                     };
 
                 let mut memo = data.bounds_memo.write().unwrap();
@@ -333,16 +344,18 @@ impl Qtz {
 
                     assert!(lo.is_none() && hi.is_none() || lo.is_some() && hi.is_some());
 
+                    let x = ((r.0 as u32 + r.1 as u32) / 2) as u16;
+
                     if let Some(l) = lo {
                         if let Some(h) = hi {
                             (l, h)
                         }
                         else {
-                            (0x7fff, 0x8000)
+                            (x, x)
                         }
                     }
                     else {
-                        (0x7fff, 0x8000)
+                        (x, x)
                     }
                 },
                 1 => {
@@ -378,16 +391,18 @@ impl Qtz {
 
                     assert!(lo.is_none() && hi.is_none() || lo.is_some() && hi.is_some());
 
+                    let x = ((g.0 as u32 + g.1 as u32) / 2) as u16;
+
                     if let Some(l) = lo {
                         if let Some(h) = hi {
                             (l, h)
                         }
                         else {
-                            (0x7fff, 0x8000)
+                            (x, x)
                         }
                     }
                     else {
-                        (0x7fff, 0x8000)
+                        (x, x)
                     }
                 },
                 2 => {
@@ -423,6 +438,7 @@ impl Qtz {
 
                     assert!(lo.is_none() && hi.is_none() || lo.is_some() && hi.is_some());
 
+                    let x = ((b.0 as u32 + b.1 as u32) / 2) as u16;
                     //let mut write = this.write().unwrap();
 
                     if let Some(l) = lo {
@@ -430,11 +446,11 @@ impl Qtz {
                             (l, h)
                         }
                         else {
-                            (0x7fff, 0x8000)
+                            (x, x)
                         }
                     }
                     else {
-                        (0x7fff, 0x8000)
+                        (x, x)
                     }
                 },
 
@@ -450,7 +466,7 @@ impl Qtz {
         (lo, hi)
     }
 
-    fn elect_qtz(this: Arc<RwLock<Self>>, r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize) -> u16 {
+    fn elect_qtz(this: Arc<RwLock<Self>>, r: (u16, u16), g: (u16, u16), b: (u16, u16), c: usize) -> (u16, u64) {
         assert!(c < 3);
 
         assert!(r.0 <= r.1);
@@ -473,27 +489,47 @@ impl Qtz {
 
         let res = if vec.is_empty() {
             match c {
-                0 => ((r.0 as u32 + r.1 as u32) >> 1) as u16,
-                1 => ((g.0 as u32 + g.1 as u32) >> 1) as u16,
-                2 => ((b.0 as u32 + b.1 as u32) >> 1) as u16,
+                0 => (((r.0 as u32 + r.1 as u32) >> 1) as u16, 0_u64),
+                1 => (((g.0 as u32 + g.1 as u32) >> 1) as u16, 0_u64),
+                2 => (((b.0 as u32 + b.1 as u32) >> 1) as u16, 0_u64),
                 _ => panic!("bad call of elect_qtz")
             }
         }
         else {
-            let mut a = 0_i64;
-            let mut b = 0_i64;
-            let mut c = 0_i64;
+            let mut av = 0_i64;
+            let mut bv = 0_i64;
+            let mut cv = 0_i64;
 
             // a * x * x + b * x + c
             // (x - v) * (x - v) -> x * x + v * v - 2 * x * v
 
             vec.iter().for_each(|v| {
-                a += 1;
-                b += -2 * *v as i64;
-                c += *v as i64 * *v as i64;
+                av += 1;
+                bv += -2 * *v as i64;
+                cv += *v as i64 * *v as i64;
             });
 
-            (-b / a / 2) as u16
+            let mut elected = if av == 0 {
+                match c {
+                    0 => ((r.0 as u32 + r.1 as u32) >> 1) as u64,
+                    1 => ((g.0 as u32 + g.1 as u32) >> 1) as u64,
+                    2 => ((b.0 as u32 + b.1 as u32) >> 1) as u64,
+                    _ => panic!("bad call of elect_qtz"),
+                }
+            } else { (-bv / av / 2) as u64 };
+
+            elected = match c {
+                0 => elected.clamp(r.0 as u64, r.1 as u64),
+                1 => elected.clamp(g.0 as u64, g.1 as u64),
+                2 => elected.clamp(b.0 as u64, b.1 as u64),
+                _ => panic!("bad call of elect_qtz"),
+            };
+
+            let err = vec.iter().fold(0_i64, |sum, v| {
+                sum + (elected as i64 - *v as i64) * (elected as i64 - *v as i64)
+            });
+
+            (elected as u16, err as u64)
         };
 
         {
@@ -505,25 +541,29 @@ impl Qtz {
     }
 
     fn elect_div(this: Arc<RwLock<Self>>, r: (u16, u16), g: (u16, u16), b: (u16, u16)) -> usize {
-        let br = Self::bounds(Arc::clone(&this), r, g, b, 0);
-        let bg = Self::bounds(Arc::clone(&this), r, g, b, 1);
-        let bb = Self::bounds(Arc::clone(&this), r, g, b, 2);
+        //let br = Self::bounds(Arc::clone(&this), r, g, b, 0);
+        //let bg = Self::bounds(Arc::clone(&this), r, g, b, 1);
+        //let bb = Self::bounds(Arc::clone(&this), r, g, b, 2);
 
         //let r_dist = br.1 - br.0;
         //let g_dist = bg.1 - bg.0;
         //let b_dist = bb.1 - bb.0;
 
-        let cr = Self::elect_qtz(Arc::clone(&this), r, g, b, 0);
-        let cg = Self::elect_qtz(Arc::clone(&this), r, g, b, 1);
-        let cb = Self::elect_qtz(Arc::clone(&this), r, g, b, 2);
+        let (cr, er) = Self::elect_qtz(Arc::clone(&this), r, g, b, 0);
+        let (cg, eg) = Self::elect_qtz(Arc::clone(&this), r, g, b, 1);
+        let (cb, eb) = Self::elect_qtz(Arc::clone(&this), r, g, b, 2);
 
-        let r0 = ((br.1 as u32 + br.0 as u32) / 2) as u16;
-        let g0 = ((bg.1 as u32 + bg.0 as u32) / 2) as u16;
-        let b0 = ((bb.1 as u32 + bb.0 as u32) / 2) as u16;
+        //let r0 = ((br.1 as u32 + br.0 as u32) / 2) as u16;
+        //let g0 = ((bg.1 as u32 + bg.0 as u32) / 2) as u16;
+        //let b0 = ((bb.1 as u32 + bb.0 as u32) / 2) as u16;
 
-        let r_dist = if cr > r0 { cr - r0 } else { r0 - cr };
-        let g_dist = if cg > g0 { cg - g0 } else { g0 - cg };
-        let b_dist = if cb > b0 { cb - b0 } else { b0 - cb };
+        //let r_dist = if cr > r0 { cr - r0 } else { r0 - cr };
+        //let g_dist = if cg > g0 { cg - g0 } else { g0 - cg };
+        //let b_dist = if cb > b0 { cb - b0 } else { b0 - cb };
+
+        let r_dist = er;
+        let g_dist = eg;
+        let b_dist = eb;
 
         if r_dist >= g_dist && r_dist >= b_dist {
             0
@@ -548,16 +588,16 @@ impl Qtz {
 
                 if pal.len() < max_ps {
                     pal.push((
-                        (q_0 >> 8) as u8,
-                        (q_1 >> 8) as u8,
-                        (q_2 >> 8) as u8,
+                        (q_0.0 >> 8) as u8,
+                        (q_1.0 >> 8) as u8,
+                        (q_2.0 >> 8) as u8,
                         0xff
                     ));
                 }
             }
             else {
                 let c1 = Self::elect_div(Arc::clone(&this), r, g, b);
-                let split = Self::elect_qtz(Arc::clone(&this), r, g, b, c1);
+                let split = Self::elect_qtz(Arc::clone(&this), r, g, b, c1).0;
 
                 match c1 {
                     0 => {
@@ -636,6 +676,8 @@ pub fn elect_palette(orig: &Vec<Vec<RGBA16>>, bits: usize) -> Vec<RGBA> {
         let mut workers = vec![];
 
         let data1 = Arc::clone(&data);
+
+        //Qtz::elect_palette_sub(data1, (0, 0xffff), (0, 0xffff), (0, 0xffff), bits, 1 << bits);
 
         //let data1 = Arc::new(RwLock::new(qtz));
 
@@ -868,7 +910,7 @@ pub fn convert_hdr(dest: ColorType, orig: Vec<Vec<RGBA16>>, err_diff: bool) -> R
 mod tests {
     use super::*;
 
-    const ORIG: &str = "fixtures/srce.png";
+    const ORIG: &str = "fixtures/ada.png";
 
     #[test]
     pub fn test_convert() {
