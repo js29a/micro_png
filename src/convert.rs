@@ -197,67 +197,67 @@ impl Qtz {
         assert!(g.0 <= g.1);
         assert!(b.0 <= b.1);
 
-        let data = this.read().unwrap();
-
-        let mut output: Vec<u16> = Vec::new();
-        output.reserve(data.width * data.height);
-
-        r.0 >>= 8;
-        g.0 >>= 8;
-        b.0 >>= 8;
-
-        r.1 >>= 8;
-        g.1 >>= 8;
-        b.1 >>= 8;
-
         let key: QtzKey  = (r, g, b, c);
+        let mut output: Vec<u16> = Vec::new();
 
-        if let Some(v) = data.vec_memo.get(&key) {
-            return v.clone()
-        }
+        {
+            let data = this.read().unwrap();
+            output.reserve(data.width * data.height);
 
-        match c {
-            0 =>
-                (r.0 ..= r.1).for_each(|rr| {
-                    (g.0 ..= g.1).for_each(|gg| {
-                        (b.0 ..= b.1).for_each(|bb| {
-                            let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
-                            let cnt = data.cube[offs as usize] as usize;
-                            output.resize(output.len() + cnt, rr << 8);
-                            //(0 .. cnt).for_each(|_| output.push(rr << 8));
-                        });
-                    });
-                }),
-            1 =>
-                (g.0 ..= g.1).for_each(|gg| {
-                    (r.0 ..= r.1).for_each(|rr| {
-                        (b.0 ..= b.1).for_each(|bb| {
-                            let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
-                            let cnt = data.cube[offs as usize] as usize;
-                            output.resize(output.len() + cnt, gg << 8);
-                            //(0 .. cnt).for_each(|_| output.push(gg << 8));
-                        });
-                    });
-                }),
-            2 =>
-                (b.0 ..= b.1).for_each(|bb| {
+            r.0 >>= 8;
+            g.0 >>= 8;
+            b.0 >>= 8;
+
+            r.1 >>= 8;
+            g.1 >>= 8;
+            b.1 >>= 8;
+
+            if let Some(v) = data.vec_memo.get(&key) {
+                return v.clone()
+            }
+
+            match c {
+                0 =>
                     (r.0 ..= r.1).for_each(|rr| {
                         (g.0 ..= g.1).for_each(|gg| {
-                            let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
-                            let cnt = data.cube[offs as usize] as usize;
-                            output.resize(output.len() + cnt, bb << 8);
-                            //(0 .. cnt).for_each(|_| output.push(bb << 8));
+                            (b.0 ..= b.1).for_each(|bb| {
+                                let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
+                                let cnt = data.cube[offs as usize] as usize;
+                                output.resize(output.len() + cnt, rr << 8);
+                                //(0 .. cnt).for_each(|_| output.push(rr << 8));
+                            });
                         });
-                    });
-                }),
-            _ => panic!("bad call of elect_qtz (c={c})")
-        };
+                    }),
+                1 =>
+                    (g.0 ..= g.1).for_each(|gg| {
+                        (r.0 ..= r.1).for_each(|rr| {
+                            (b.0 ..= b.1).for_each(|bb| {
+                                let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
+                                let cnt = data.cube[offs as usize] as usize;
+                                output.resize(output.len() + cnt, gg << 8);
+                                //(0 .. cnt).for_each(|_| output.push(gg << 8));
+                            });
+                        });
+                    }),
+                2 =>
+                    (b.0 ..= b.1).for_each(|bb| {
+                        (r.0 ..= r.1).for_each(|rr| {
+                            (g.0 ..= g.1).for_each(|gg| {
+                                let offs = ((rr as u32) << 16) | ((gg as u32) << 8) | bb as u32;
+                                let cnt = data.cube[offs as usize] as usize;
+                                output.resize(output.len() + cnt, bb << 8);
+                                //(0 .. cnt).for_each(|_| output.push(bb << 8));
+                            });
+                        });
+                    }),
+                _ => panic!("bad call of elect_qtz (c={c})")
+            };
+        }
 
         output.shrink_to_fit();
 
-        let mut write = this.write().unwrap();
-
-        write.vec_memo.insert(key, output.clone());
+        //let mut write = this.write().unwrap();
+        //write.vec_memo.insert(key, output.clone());
 
         output
     }
@@ -284,8 +284,8 @@ impl Qtz {
                 hi = v[v.len() - 1]
             }
 
-            let mut write = this.write().unwrap();
-            write.bounds_memo.insert(key, (lo, hi));
+            //let mut write = this.write().unwrap();
+            //write.bounds_memo.insert(key, (lo, hi));
 
             (lo, hi)
         } else {
@@ -327,14 +327,14 @@ impl Qtz {
 
                     assert!(lo.is_none() && hi.is_none() || lo.is_some() && hi.is_some());
 
-                    let mut write = this.write().unwrap();
+                    //let mut write = this.write().unwrap();
 
                     if lo.is_some() && hi.is_some() {
-                        write.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
+                        //write.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
                         (lo.unwrap(), hi.unwrap())
                     }
                     else {
-                        write.bounds_memo.insert(key, (0x7fff, 0x8000));
+                        //write.bounds_memo.insert(key, (0x7fff, 0x8000));
                         (0x7fff, 0x8000)
                     }
                 },
@@ -371,14 +371,14 @@ impl Qtz {
 
                     assert!(lo.is_none() && hi.is_none() || lo.is_some() && hi.is_some());
 
-                    let mut write = this.write().unwrap();
+                    //let mut write = this.write().unwrap();
 
                     if lo.is_some() && hi.is_some() {
-                        write.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
+                        //write.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
                         (lo.unwrap(), hi.unwrap())
                     }
                     else {
-                        write.bounds_memo.insert(key, (0x7fff, 0x8000));
+                        //write.bounds_memo.insert(key, (0x7fff, 0x8000));
                         (0x7fff, 0x8000)
                     }
 
@@ -416,14 +416,14 @@ impl Qtz {
 
                     assert!(lo.is_none() && hi.is_none() || lo.is_some() && hi.is_some());
 
-                    let mut write = this.write().unwrap();
+                    //let mut write = this.write().unwrap();
 
                     if lo.is_some() && hi.is_some() {
-                        write.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
+                        //write.bounds_memo.insert(key, (lo.unwrap(), hi.unwrap()));
                         (lo.unwrap(), hi.unwrap())
                     }
                     else {
-                        write.bounds_memo.insert(key, (0x7fff, 0x8000));
+                        //write.bounds_memo.insert(key, (0x7fff, 0x8000));
                         (0x7fff, 0x8000)
                     }
                 },
@@ -480,9 +480,8 @@ impl Qtz {
             (-b / a / 2) as u16
         };
 
-        let mut write = this.write().unwrap();
-
-        write.qtz_memo.insert(key, res);
+        //let mut write = this.write().unwrap();
+        //write.qtz_memo.insert(key, res);
 
         res
     }
