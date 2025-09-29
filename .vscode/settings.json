@@ -1,0 +1,11 @@
+{
+    "rust-analyzer.procMacro.attributes.enable": true,
+    "rust-analyzer.debug.engine": "auto",
+    "terminal.integrated.cursorBlinking": true,
+    "terminal.integrated.defaultProfile.windows": "Git Bash",
+    "editor.fontLigatures": true,
+    "editor.wordWrap": "on",
+    "editor.fontFamily": "'Victor Mono', Consolas, 'Courier New', monospace",
+    "editor.fontSize": 13,
+    "terminal.integrated.fontSize": 13
+}
