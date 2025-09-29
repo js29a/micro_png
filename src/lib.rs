@@ -9,14 +9,14 @@ use std::fs;
 
 use std::collections::HashMap;
 
-use async_std::task::spawn;
-use futures::future::join_all;
+// use async_std::task::spawn;
+// use futures::future::join_all;
 
 use flate2::Compression;
 use flate2::write::ZlibEncoder;
 use flate2::read::ZlibDecoder;
 use crc32fast::Hasher;
-use quicklz::{compress, CompressionLevel};
+// use quicklz::{compress, CompressionLevel};
 
 /// RGB 8 bits.
 pub type RGB = (u8, u8, u8);
@@ -310,7 +310,7 @@ impl APNGBuilder {
 /// Write progress callback.
 pub type APNGProgress = fn (cur: usize, total: usize, descr: &str);
 
-type Pred = fn (line: &[RGBA16], above: &[RGBA16], color_type: ColorType) -> Vec<u8>;
+// type Pred = fn (line: &[RGBA16], above: &[RGBA16], color_type: ColorType) -> Vec<u8>;
 
 fn sub(a: u8, b: u8) -> u8 {
     (a as i16 - b as i16) as u8
@@ -944,41 +944,41 @@ fn png_rev(left: u8, up: u8, corner: u8, est: Filter) -> u8 {
     }
 }
 
-fn pk_size(payload: &[u8]) -> usize {
-    compress(payload, CompressionLevel::Lvl1).len() // NOTE quick estimation
-}
+// fn pk_size(payload: &[u8]) -> usize {
+//     compress(payload, CompressionLevel::Lvl1).len() // NOTE quick estimation
+// }
 
-async fn estimate_worker(est: Filter, so_far: Vec<u8>, payload: Vec<u8>) -> (Filter, usize, Vec<u8>) {
-    async fn doit(_so_far: Vec<u8>, payload: Vec<u8>) -> usize {
-        pk_size(&payload[..])
-    }
+// async fn estimate_worker(est: Filter, so_far: Vec<u8>, payload: Vec<u8>) -> (Filter, usize, Vec<u8>) {
+//     async fn doit(_so_far: Vec<u8>, payload: Vec<u8>) -> usize {
+//         pk_size(&payload[..])
+//     }
 
-    (est, spawn(doit(so_far, payload.clone())).await, payload)
-}
+//     (est, spawn(doit(so_far, payload.clone())).await, payload)
+// }
 
-fn elect_best(preds: &[(Filter, Pred)], so_far: Vec<u8>, line: &[RGBA16], above: &[RGBA16], color_type: ColorType) ->
-    (Filter, Vec<u8>) {
+// fn elect_best(preds: &[(Filter, Pred)], so_far: Vec<u8>, line: &[RGBA16], above: &[RGBA16], color_type: ColorType) ->
+//     (Filter, Vec<u8>) {
 
-    let tasks = preds.iter().map(|(id, func)| {
-        estimate_worker(*id, so_far.clone(), func(line, above, color_type))
-    });
+//     let tasks = preds.iter().map(|(id, func)| {
+//         estimate_worker(*id, so_far.clone(), func(line, above, color_type))
+//     });
 
-    let output = futures_executor::block_on(join_all(tasks));
+//     let output = futures_executor::block_on(join_all(tasks));
 
-    let mut best = Filter::None;
-    let mut bsize = output[0].1;
-    let mut bpayload: Vec<u8> = output[0].2.clone();
+//     let mut best = Filter::None;
+//     let mut bsize = output[0].1;
+//     let mut bpayload: Vec<u8> = output[0].2.clone();
 
-    output.iter().for_each(|(key, size, payload)| {
-        if bsize > *size {
-            best = *key;
-            bsize = *size;
-            bpayload = payload.clone();
-        }
-    });
+//     output.iter().for_each(|(key, size, payload)| {
+//         if bsize > *size {
+//             best = *key;
+//             bsize = *size;
+//             bpayload = payload.clone();
+//         }
+//     });
 
-    (best, bpayload)
-}
+//     (best, bpayload)
+// }
 
 fn prepare_frames(image_data: &ImageData) -> Vec<Vec<Vec<RGBA16>>> {
     match image_data {
@@ -1141,18 +1141,18 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
     stats: &mut Stats, ndx: u32, filter: Option<Filter>, seq: &mut u32, frames: &Vec<Vec<Vec<RGBA16>>>,
     adam_7: bool) -> Vec<u8> {
 
-    let preds_first: Vec<(Filter, Pred)> = vec![
-        (Filter::None, png_none),
-        (Filter::Sub, png_sub)
-    ];
+    // let preds_first: Vec<(Filter, Pred)> = vec![
+    //     (Filter::None, png_none),
+    //     (Filter::Sub, png_sub)
+    // ];
 
-    let preds_next: Vec<(Filter, Pred)> = vec![
-        (Filter::None, png_none),
-        (Filter::Sub, png_sub),
-        (Filter::Up, png_up),
-        (Filter::Avg, png_avg),
-        (Filter::Paeth, png_paeth)
-    ];
+    // let preds_next: Vec<(Filter, Pred)> = vec![
+    //     (Filter::None, png_none),
+    //     (Filter::Sub, png_sub),
+    //     (Filter::Up, png_up),
+    //     (Filter::Avg, png_avg),
+    //     (Filter::Paeth, png_paeth)
+    // ];
 
     let mut payload: Vec<u8> = Vec::new();
     let mut above: Vec<RGBA16> = vec![];
@@ -1191,7 +1191,7 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
                 }
             }
 
-            let mut so_far: Vec<u8> = vec![];
+            // let so_far: Vec<u8> = vec![];
 
             let mut line = if adam_7 && frames.len() == 1 {
                 let ay = y % ADAM_7_SZ;
@@ -1275,16 +1275,20 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
                         stats.n_sub += 1;
                     },
                     None => { // NOTE elect
-                        let (best, bpayload) = elect_best(&preds_first, so_far.clone(), &line, &Vec::new(), color_type);
+                        let p_sub = png_sub(&line[..], &[], color_type);
+                        payload.extend(&p_sub);
+                        stats.n_sub += 1;
+                        // Some(Filter::Up)
+                        // let (best, bpayload) = elect_best(&preds_first, so_far.clone(), &line, &Vec::new(), color_type);
 
-                        so_far.extend(&bpayload);
-                        payload.extend(bpayload);
+                        // so_far.extend(&bpayload);
+                        // payload.extend(bpayload);
 
-                        match best {
-                            Filter::None => stats.n_none += 1,
-                            Filter::Sub => stats.n_sub += 1,
-                            _ => panic!("pred elect @ one line: failure")
-                        }
+                        // match best {
+                        //     Filter::None => stats.n_none += 1,
+                        //     Filter::Sub => stats.n_sub += 1,
+                        //     _ => panic!("pred elect @ one line: failure")
+                        // }
                     }
                 }
                 first = false;
@@ -1312,18 +1316,21 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
                         payload.extend(png_paeth(&line[..], &above[..], color_type));
                     },
                     None => { // NOTE elect
-                        let (best, bpayload) = elect_best(&preds_next, so_far.clone(), &line, &above, color_type);
+                        stats.n_paeth += 1;
+                        payload.extend(png_paeth(&line[..], &above[..], color_type));
+                        // Some(Fi)
+                        // let (best, bpayload) = elect_best(&preds_next, so_far.clone(), &line, &above, color_type);
 
-                        so_far.extend(&bpayload);
-                        payload.extend(bpayload);
+                        // so_far.extend(&bpayload);
+                        // payload.extend(bpayload);
 
-                        match best {
-                            Filter::None => stats.n_none += 1,
-                            Filter::Sub => stats.n_sub += 1,
-                            Filter::Up => stats.n_up += 1,
-                            Filter::Avg => stats.n_avg += 1,
-                            Filter::Paeth => stats.n_paeth += 1
-                        }
+                        // match best {
+                        //     Filter::None => stats.n_none += 1,
+                        //     Filter::Sub => stats.n_sub += 1,
+                        //     Filter::Up => stats.n_up += 1,
+                        //     Filter::Avg => stats.n_avg += 1,
+                        //     Filter::Paeth => stats.n_paeth += 1
+                        // }
                     }
                 }
             }
