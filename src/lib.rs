@@ -1164,17 +1164,13 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
         first = true;
         above = vec![];
 
-        if adam_7 {
-            if let Some(p) = progress {
-                p(a - 1, a_hi - a_lo + 1, "Adam7");
-            }
+        if adam_7 && let Some(p) = progress {
+            p(a - 1, a_hi - a_lo + 1, "Adam7");
         }
 
         zip(0 .. frame.len(), frame.iter()).for_each(|(y, row_raw)| {
-            if !adam_7 {
-                if let Some(p) = progress {
-                    p(y, frame.len(), "lines");
-                }
+            if !adam_7 && let Some(p) = progress {
+                p(y, frame.len(), "lines");
             }
 
             let mut line = if adam_7 && frames.len() == 1 {
@@ -1462,10 +1458,8 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
     let mut stats = Stats::default();
 
     zip(0 .. frames.len() as u32, frames.iter()).for_each(|(ndx, frame)| {
-        if frames.len() > 1 && progress.is_some() {
-            if let Some(p) = progress {
-                p(ndx as usize, frames.len(), "frames");
-            }
+        if frames.len() > 1 && progress.is_some() && let Some(p) = progress {
+            p(ndx as usize, frames.len(), "frames");
         }
 
         if frames.len() > 1 {
@@ -2611,15 +2605,12 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
             }
         }
 
-        if chunk.0 == "tRNS" {
-            if let ColorType::NDX(p) = color_type {
-                (0 .. chunk.1.len()).for_each(|pndx| {
-                    pal[pndx].3 = chunk.1[pndx];
-                });
+        if chunk.0 == "tRNS" && let ColorType::NDX(p) = color_type {
+            (0 .. chunk.1.len()).for_each(|pndx| {
+                pal[pndx].3 = chunk.1[pndx];
+            });
 
-                color_type = ColorType::NDXA(p); // NOTE upgrade
-            }
-            // NOTE just ignore
+            color_type = ColorType::NDXA(p); // NOTE upgrade
         }
 
         if chunk.0 == "tEXt" {
