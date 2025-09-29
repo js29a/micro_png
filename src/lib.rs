@@ -321,17 +321,23 @@ impl APNGBuilder {
     }
 
 /// Set ppm.
-    pub fn set_ppm(mut self, ppm: Option<(u32, u32)>) -> Self {
-        self.ppm = ppm;
+    pub fn set_ppm(mut self, h: u32, v: u32) -> Self {
+        self.ppm = Some((h, v));
         self
     }
 
 /// Set dpi.
-    pub fn set_dpi(mut self, ppm: Option<(u32, u32)>) -> Self {
-        self.ppm = ppm.map(|d| (
-            (d.0 as f64 / 0.0254 + 0.5) as u32,
-            (d.1 as f64 / 0.0254 + 0.5) as u32,
+    pub fn set_dpi(mut self, h: u32, v: u32) -> Self {
+        self.ppm = Some((
+            (h as f64 / 0.0254 + 0.5) as u32,
+            (v as f64 / 0.0254 + 0.5) as u32,
         ));
+        self
+    }
+
+// Clear ppm / dpi.
+    pub fn clear_res(mut self) -> Self {
+        self.ppm = None;
         self
     }
 }
@@ -1185,21 +1191,18 @@ fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
 
                 row
             }
-            else {
-                let line = if ndx == 0 {
+            else if ndx == 0 {
                     row_raw.clone()
-                }
-                else {
-                    zip(row_raw.iter(), frames[ndx as usize - 1][y].iter()).map(|(cur, prev)| {
-                        if (color_type == ColorType::RGBA || color_type == ColorType::RGBA16) && *cur == *prev {
-                            (0, 0, 0, 0)
-                        }
-                        else {
-                            *cur
-                        }
-                    }).collect::<Vec<RGBA16>>()
-                };
-                line
+            }
+            else {
+                zip(row_raw.iter(), frames[ndx as usize - 1][y].iter()).map(|(cur, prev)| {
+                    if (color_type == ColorType::RGBA || color_type == ColorType::RGBA16) && *cur == *prev {
+                        (0, 0, 0, 0)
+                    }
+                    else {
+                        *cur
+                    }
+                }).collect::<Vec<RGBA16>>()
             };
 
             if line.is_empty() {
@@ -1676,13 +1679,13 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
         ColorType::RGBA => width * 4 + 1,
         ColorType::RGB => width * 3 + 1,
         ColorType::NDXA(Palette::P8) | ColorType::NDX(Palette::P8) => width + 1,
-        ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => ((width + 1) / 2) + 1,
-        ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => ((width + 3) / 4) + 1,
-        ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) / 8) + 1,
+        ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => ((width + 1) >> 1) + 1,
+        ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => ((width + 3) >> 2) + 1,
+        ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) >> 3) + 1,
 
-        ColorType::GRAY(Grayscale::G1) => (width + 7) / 8 + 1,
-        ColorType::GRAY(Grayscale::G2) =>  (width + 3) / 4 + 1,
-        ColorType::GRAY(Grayscale::G4) =>  (width + 1) / 2 + 1,
+        ColorType::GRAY(Grayscale::G1) => ((width + 7) >> 3) + 1,
+        ColorType::GRAY(Grayscale::G2) =>  ((width + 3) >> 2) + 1,
+        ColorType::GRAY(Grayscale::G4) =>  ((width + 1) >> 1) + 1,
 
         ColorType::GRAY(Grayscale::G8) => width + 1,
         ColorType::GRAYA(Grayscale::G8) => width * 2 + 1,
@@ -1707,12 +1710,12 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
             ColorType::RGBA => (width * 4 + 1) * y,
             ColorType::RGB => (width * 3 + 1) * y,
             ColorType::NDXA(Palette::P8) | ColorType::NDX(Palette::P8) => (width + 1) * y,
-            ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => ((width + 1) / 2 + 1) * y,
-            ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => ((width + 3) / 4 + 1) * y,
-            ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => ((width + 7) / 8 + 1) * y,
-            ColorType::GRAY(Grayscale::G1) => ((width + 7) / 8 + 1) * y,
-            ColorType::GRAY(Grayscale::G2) => ((width + 3) / 4 + 1) * y,
-            ColorType::GRAY(Grayscale::G4) => ((width + 1) / 2 + 1) * y,
+            ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => (((width + 1) >> 1) + 1) * y,
+            ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => (((width + 3) >> 2) + 1) * y,
+            ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => (((width + 7) >> 3) + 1) * y,
+            ColorType::GRAY(Grayscale::G1) => (((width + 7) >> 3) + 1) * y,
+            ColorType::GRAY(Grayscale::G2) => (((width + 3) >> 2) + 1) * y,
+            ColorType::GRAY(Grayscale::G4) => (((width + 1) >> 1) + 1) * y,
             ColorType::GRAY(Grayscale::G8) => (width + 1) * y,
             ColorType::GRAYA(Grayscale::G8) => (width * 2 + 1) * y,
             ColorType::GRAY(Grayscale::G16) => (width * 2 + 1) * y,
@@ -1951,9 +1954,9 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
             ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => {
                 let line_width = match color_type {
                     ColorType::NDXA(Palette::P8) | ColorType::NDX(Palette::P8) => width,
-                    ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => (width + 1) / 2,
-                    ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => (width + 3) / 4,
-                    ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => (width + 7) / 8,
+                    ColorType::NDXA(Palette::P4) | ColorType::NDX(Palette::P4) => (width + 1) >> 1,
+                    ColorType::NDXA(Palette::P2) | ColorType::NDX(Palette::P2) => (width + 3) >> 2,
+                    ColorType::NDXA(Palette::P1) | ColorType::NDX(Palette::P1) => (width + 7) >> 3,
                     _ => panic!("internal unpack_idat error"),
                 };
 
@@ -2205,9 +2208,9 @@ fn unpack_idat(width: usize, height: usize, raw: &[u8], color_type: ColorType, p
             ColorType::GRAY(Grayscale::G2) |
             ColorType::GRAY(Grayscale::G1) => {
                 let line_width = match color_type {
-                    ColorType::GRAY(Grayscale::G4) => (width + 1) / 2,
-                    ColorType::GRAY(Grayscale::G2) => (width + 3) / 4,
-                    ColorType::GRAY(Grayscale::G1) => (width + 7) / 8,
+                    ColorType::GRAY(Grayscale::G4) => (width + 1) >> 1,
+                    ColorType::GRAY(Grayscale::G2) => (width + 3) >> 2,
+                    ColorType::GRAY(Grayscale::G1) => (width + 7) >> 3,
                     _ => panic!("unpack_idat bad case")
                 };
 
