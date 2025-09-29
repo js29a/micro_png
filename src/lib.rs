@@ -1098,7 +1098,7 @@ struct Stats {
 
 #[allow(clippy::too_many_arguments)]
 fn emit_frame(color_type: ColorType, progress: Option<APNGProgress>,
-    stats: &mut Stats, ndx: u32, filter: Option<Filter>, seq: &mut u32, frames: &Vec<Vec<Vec<RGBA16>>>,
+    stats: &mut Stats, ndx: u32, filter: Option<Filter>, seq: &mut u32, frames: &[Vec<Vec<RGBA16>>],
     adam_7: bool) -> Vec<u8> {
 
     let mut payload: Vec<u8> = Vec::new();

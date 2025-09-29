@@ -16,6 +16,8 @@ fn from_readme() {
 
     // now write it back as one-frame image
 
+    println!("tmp/back.png");
+
     write_apng("tmp/back.png",
         ImageData::RGBA16(vec![data]),
         None ,// automatically select filtering
@@ -30,6 +32,8 @@ fn from_readme() {
         vec![(0, 0, 0, 255), (255, 0, 0, 255)],// the 2nd line
     ];
 
+    println!("tmp/2x2.png");
+
     write_apng("tmp/2x2.png",
         ImageData::RGBA(vec![data]), // write one frame
         None ,// automatically select filtering
@@ -43,6 +47,8 @@ fn from_readme() {
         vec![(255, 0, 0, 255), (0, 0, 0, 255)],// the 1st line
         vec![(0, 0, 0, 255), (255, 0, 0, 255)],// the 2nd line
     ];
+
+    println!("tmp/foo.png");
 
     let builder = APNGBuilder::new("tmp/foo.png", ImageData::RGBA(vec![data_1]))
         .set_adam_7(true);
@@ -66,6 +72,8 @@ fn from_readme() {
         ],
     ];
 
+    println!("tmp/bar.png");
+
     build_apng(
        APNGBuilder::new("tmp/bar.png", ImageData::RGBA(data_2))
            .set_def_dur((100, 1000)) // default frame duration: 100 / 1000 [sec]
@@ -84,6 +92,8 @@ fn from_wiki_copy() {
     else {
         panic!("sth wrong with fixtures/test.png")
     }
+
+    println!("tmp/test-HDR.png");
 
     // 3. save it as HDR (16 bit component depth)
     build_apng(APNGBuilder::new("tmp/test-HDR.png", ImageData::RGBA16(vec![image.data()]))).unwrap();
@@ -118,6 +128,8 @@ fn from_wiki_truecolor() {
             image_rgb[y][x].2 = 0xff; // blue
         });
     });
+
+    println!("tmp/test-RGB.png");
 
     // 2. write it into a file
     build_apng(APNGBuilder::new("tmp/test-RGB.png", ImageData::RGB(vec![image_rgb]))).unwrap();
@@ -161,6 +173,8 @@ fn from_wiki_u8() {
 
     let orig = data.clone(); // used at point 4.
 
+    println!("tmp/meta.png");
+
     // 2. serialize the image
     let vector: Vec<u8> = build_apng_u8(
          APNGBuilder::new("tmp/meta.png", ImageData::RGBA(vec![data]))
@@ -184,6 +198,8 @@ fn from_wiki_speed() {
         vec![(0, 0, 0, 255), (255, 0, 0, 255)],
         vec![(0, 255, 0, 255), (255, 255, 0, 255)],
     ];
+
+    println!("tmp/paeth.png");
 
     // 2. serialize the image
     build_apng(
