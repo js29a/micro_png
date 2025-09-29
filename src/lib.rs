@@ -234,7 +234,8 @@ pub struct APNGBuilder {
     def_dur: (u16, u16),
     dur: HashMap<u32, (u16, u16)>,
     meta: HashMap<String, String>,
-    zmeta: HashMap<String, String>
+    zmeta: HashMap<String, String>,
+    ppm: Option<(u32, u32)>
 }
 
 impl APNGBuilder {
@@ -254,7 +255,8 @@ impl APNGBuilder {
             def_dur: (1, 25),
             dur: HashMap::new(),
             meta,
-            zmeta: HashMap::new()
+            zmeta: HashMap::new(),
+            ppm: None
         }
     }
 
@@ -315,6 +317,23 @@ impl APNGBuilder {
 /// Set zlibed metadata.
     pub fn set_zmeta(mut self, key: &str, value: &str) -> Self {
         self.zmeta.insert(key.to_string(), value.to_string());
+        self
+    }
+
+/// Set ppm.
+    pub fn set_ppm(mut self, ppm: Option<(u32, u32)>) -> Self {
+        self.ppm = ppm;
+        self
+    }
+
+/// Set dpi.
+    pub fn set_dpi(mut self, ppm: Option<(u32, u32)>) -> Self {
+        self.ppm = ppm.map(|d| (
+            (
+                (d.0 as f64 / 0.0254 + 0.5) as u32,
+                (d.1 as f64 / 0.0254 + 0.5) as u32,
+            )
+        ));
         self
     }
 }
@@ -1396,6 +1415,14 @@ pub fn build_apng_u8(builder: APNGBuilder) -> Result<Vec<u8>, String> {
     res.extend(png_chunk(&ihdr));
 
     res.extend(gen_palette(image_data));
+
+    if let Some(ppm) = builder.ppm {
+        let mut body: Vec<u8> = b"pHYs".to_vec();
+        body.extend(ppm.0.to_be_bytes());
+        body.extend(ppm.1.to_be_bytes());
+        body.extend(b"\x01");
+        res.extend(png_chunk(&body));
+    }
 
     builder.meta.iter().for_each(|(k, v)| {
         let mut text: Vec<u8> = b"tEXt".to_vec();
