@@ -18,9 +18,9 @@ fn main() {
     let data = image.data();
 
     (0 .. image.height()).for_each(|y| {
-      (0 .. image.width()).for_each(|x| {
-        let _pixel = data[y][x]; // (u16, u16, u16, u16)
-      });
+        (0 .. image.width()).for_each(|x| {
+            let _pixel = data[y][x]; // (u16, u16, u16, u16)
+        });
     });
 
     // now write it back as one-frame image
@@ -79,6 +79,7 @@ fn main() {
        APNGBuilder::new("tmp/bar.png", ImageData::RGBA(data_2))
            .set_def_dur((100, 1000)) // default frame duration: 100 / 1000 [sec]
            .set_dur(1, (500, 1000)) // duration for frame #1: 500 / 1000 [sec]
+           .set_dpi(300, 300) // change DPI
     ).unwrap();
 }
 ```
