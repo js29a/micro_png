@@ -329,10 +329,8 @@ impl APNGBuilder {
 /// Set dpi.
     pub fn set_dpi(mut self, ppm: Option<(u32, u32)>) -> Self {
         self.ppm = ppm.map(|d| (
-            (
-                (d.0 as f64 / 0.0254 + 0.5) as u32,
-                (d.1 as f64 / 0.0254 + 0.5) as u32,
-            )
+            (d.0 as f64 / 0.0254 + 0.5) as u32,
+            (d.1 as f64 / 0.0254 + 0.5) as u32,
         ));
         self
     }
@@ -2443,16 +2441,14 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
             }
         }
 
-        if chunk.0 == "pHYs" && chunk.1.len() == 9 {
-            if chunk.1[8] == 1 {
-                let horz = &chunk.1[0 .. 4];
-                let vert = &chunk.1[4 .. 8];
+        if chunk.0 == "pHYs" && chunk.1.len() == 9 && chunk.1[8] == 1 {
+            let horz = &chunk.1[0 .. 4];
+            let vert = &chunk.1[4 .. 8];
 
-                let horz = u32::from_be_bytes(horz.try_into().unwrap());
-                let vert = u32::from_be_bytes(vert.try_into().unwrap());
+            let horz = u32::from_be_bytes(horz.try_into().unwrap());
+            let vert = u32::from_be_bytes(vert.try_into().unwrap());
 
-                ppm = Some((horz, vert));
-            }
+            ppm = Some((horz, vert));
         }
 
         if prev_idat && chunk.0 != "IDAT" {

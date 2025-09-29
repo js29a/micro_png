@@ -118,7 +118,7 @@ fn from_wiki_truecolor() {
     });
 
     // 2. write it into a file
-    build_apng(APNGBuilder::new("tmp/test-RGBA.png", ImageData::RGBA(vec![image_rgba])).set_dpi(Some((150, 150)))).unwrap();
+    build_apng(APNGBuilder::new("tmp/test-RGBA.png", ImageData::RGBA(vec![image_rgba])).set_dpi(Some((300, 300)))).unwrap();
 
     // 3. generate some RGB data
     let mut image_rgb: Vec<Vec<RGB>> = vec![vec![(0, 0, 0); 64]; 64];
