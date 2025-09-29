@@ -1,3 +1,13 @@
+## 0.4.0 (2025-09-29T12:15:45)
+  - 0-clippy
+  - DPI set OK
+  - ppm / dpi read OK
+  - further clean-up
+  - clean-up - WIP
+  - no more threads - fallback to Paeth
+  - license
+  - docs; examples
+
 ## 0.3.5 (2023-09-02T08:07:28)
   - strict frames checking
   - some unpack_idat-related re-factoring
