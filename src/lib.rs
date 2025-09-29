@@ -149,6 +149,7 @@ pub struct Image {
     height: usize,
     data: Vec<Vec<RGBA16>>,
     meta: HashMap<String, String>,
+    ppm: Option<(u32, u32)>,
     raw: ImageData
 }
 
@@ -181,6 +182,21 @@ impl Image {
 /// Image metadata getter.
     pub fn meta(&self) -> &HashMap<String, String> {
         &self.meta
+    }
+
+// Pixels per meter getter.
+    pub fn ppm(&self) -> Option<(u32, u32)> {
+        self.ppm
+    }
+
+// Pixels per inch getter.
+    pub fn dpi(&self) -> Option<(u32, u32)> {
+        self.ppm.map(|ppm| {
+            (
+                (ppm.0 as f64 * 0.0254 + 0.5) as u32,
+                (ppm.1 as f64 * 0.0254 + 0.5) as u32
+            )
+        })
     }
 }
 
@@ -2321,6 +2337,8 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
 
     let mut adam_7 = false;
 
+    let mut ppm: Option<(u32, u32)> = None;
+
     loop {
         let chunk = get_chunk(&buf[offs ..])?;
 
@@ -2395,6 +2413,18 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
             }
             else {
                 adam_7 = ilace == 1;
+            }
+        }
+
+        if chunk.0 == "pHYs" && chunk.1.len() == 9 {
+            if chunk.1[8] == 1 {
+                let horz = &chunk.1[0 .. 4];
+                let vert = &chunk.1[4 .. 8];
+
+                let horz = u32::from_be_bytes(horz.try_into().unwrap());
+                let vert = u32::from_be_bytes(vert.try_into().unwrap());
+
+                ppm = Some((horz, vert));
             }
         }
 
@@ -2648,6 +2678,7 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                 color_type,
                 data,
                 meta,
+                ppm,
                 raw: new_raw
             })
         },
@@ -2658,6 +2689,7 @@ pub fn read_png_u8(buf: &[u8]) -> Result<Image, String> {
                 color_type,
                 data,
                 meta,
+                ppm,
                 raw: raw.unwrap()
             })
     }

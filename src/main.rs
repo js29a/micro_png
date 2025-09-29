@@ -4,6 +4,8 @@ fn from_readme() {
     // load an image
     let image = read_png("fixtures/test.png").expect("can't load test.png");
 
+    assert_eq!(image.dpi(), Some((300, 300)));
+
     println!("{} x {}", image.width(), image.height());
 
     let data = image.data();
