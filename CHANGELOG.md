@@ -1,3 +1,9 @@
+## 0.5.0 (2026-05-23T11:24:00)
+  - Cargo.toml clean-up
+  - 0-clippy after Rust update
+  - docs update
+  - 2024 edition
+
 ## 0.4.1 (2025-09-29T15:25:31)
   - 0-clippy
 
