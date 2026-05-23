@@ -1,3 +1,5 @@
+[![Socket Badge](https://badge.socket.dev/cargo/package/micro-png/0.5.0)](https://badge.socket.dev/cargo/package/micro-png/0.5.0)
+
 project Wiki
 ============
 
